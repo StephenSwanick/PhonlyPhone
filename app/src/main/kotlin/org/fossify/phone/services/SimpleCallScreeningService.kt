@@ -7,11 +7,17 @@ import org.fossify.commons.extensions.getMyContactsCursor
 import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.commons.helpers.ContactLookupResult
 import org.fossify.commons.helpers.SimpleContactsHelper
+import org.fossify.phone.helpers.CallAllowlist
 
 class SimpleCallScreeningService : CallScreeningService() {
 
     override fun onScreenCall(callDetails: Call.Details) {
         val number = callDetails.handle?.schemeSpecificPart
+        if (!CallAllowlist.isNumberAllowed(this, number)) {
+            respondToCall(callDetails, isBlocked = true)
+            return
+        }
+
         when {
             number != null && isNumberBlocked(number) -> {
                 respondToCall(callDetails, isBlocked = true)

@@ -2,6 +2,7 @@ package org.fossify.phone.extensions
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.Uri
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
@@ -12,31 +13,36 @@ import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.extensions.canUseFullScreenIntent
 import org.fossify.commons.extensions.initiateCall
 import org.fossify.commons.extensions.isDefaultDialer
-import org.fossify.commons.extensions.launchCallIntent
 import org.fossify.commons.extensions.openFullScreenIntentSettings
 import org.fossify.commons.extensions.openNotificationSettings
 import org.fossify.commons.extensions.telecomManager
+import org.fossify.commons.helpers.PERMISSION_CALL_PHONE
 import org.fossify.commons.helpers.PERMISSION_READ_PHONE_STATE
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.phone.BuildConfig
 import org.fossify.phone.activities.DialerActivity
 import org.fossify.phone.activities.SimpleActivity
 import org.fossify.phone.dialogs.SelectSIMDialog
+import org.fossify.phone.helpers.CallAllowlist
 
 fun SimpleActivity.startCallIntent(
     recipient: String,
     forceSimSelector: Boolean = false
 ) {
+    if (CallAllowlist.denyOutgoingIfBlocked(this, recipient)) {
+        return
+    }
+
     if (isDefaultDialer()) {
         getHandleToUse(
             intent = null,
             phoneNumber = recipient,
             forceSimSelector = forceSimSelector
         ) { handle ->
-            launchCallIntent(recipient, handle)
+            launchPhonlyCallIntent(recipient, handle)
         }
     } else {
-        launchCallIntent(recipient, null)
+        launchPhonlyCallIntent(recipient, null)
     }
 }
 
@@ -60,10 +66,10 @@ fun SimpleActivity.startCallWithConfirmationCheck(contact: Contact) {
             activity = this,
             callee = contact.getNameToDisplay()
         ) {
-            initiateCall(contact) { launchCallIntent(it) }
+            initiateCall(contact) { launchPhonlyCallIntent(it) }
         }
     } else {
-        initiateCall(contact) { launchCallIntent(it) }
+        initiateCall(contact) { launchPhonlyCallIntent(it) }
     }
 }
 
@@ -71,12 +77,16 @@ fun BaseSimpleActivity.callContactWithSim(
     recipient: String,
     useMainSIM: Boolean
 ) {
+    if (CallAllowlist.denyOutgoingIfBlocked(this, recipient)) {
+        return
+    }
+
     handlePermission(PERMISSION_READ_PHONE_STATE) {
         val wantedSimIndex = if (useMainSIM) 0 else 1
         val handle = getAvailableSIMCardLabels()
             .sortedBy { it.id }
             .getOrNull(wantedSimIndex)?.handle
-        launchCallIntent(recipient, handle)
+        launchPhonlyCallIntent(recipient, handle)
     }
 }
 
@@ -91,6 +101,33 @@ fun BaseSimpleActivity.callContactWithSimWithConfirmationCheck(
         }
     } else {
         callContactWithSim(recipient, useMainSIM)
+    }
+}
+
+/**
+ * Commons launchCallIntent() hardcodes org.fossify.phone / .debug.
+ * Always open this app's DialerActivity instead.
+ */
+fun BaseSimpleActivity.launchPhonlyCallIntent(
+    recipient: String,
+    handle: PhoneAccountHandle? = null
+) {
+    if (CallAllowlist.denyOutgoingIfBlocked(this, recipient)) {
+        return
+    }
+
+    handlePermission(PERMISSION_CALL_PHONE) { granted ->
+        if (!granted) {
+            return@handlePermission
+        }
+
+        val intent = Intent(Intent.ACTION_CALL, Uri.fromParts("tel", recipient, null)).apply {
+            if (handle != null) {
+                putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
+            }
+            setClass(this@launchPhonlyCallIntent, DialerActivity::class.java)
+        }
+        startActivity(intent)
     }
 }
 

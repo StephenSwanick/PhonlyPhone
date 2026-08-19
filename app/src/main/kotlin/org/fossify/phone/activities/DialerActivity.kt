@@ -11,6 +11,7 @@ import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.REQUEST_CODE_SET_DEFAULT_DIALER
 import org.fossify.phone.R
 import org.fossify.phone.extensions.getHandleToUse
+import org.fossify.phone.helpers.CallAllowlist
 
 class DialerActivity : SimpleActivity() {
     private var callNumber: Uri? = null
@@ -36,6 +37,12 @@ class DialerActivity : SimpleActivity() {
     @SuppressLint("MissingPermission")
     private fun initOutgoingCall() {
         try {
+            val number = callNumber?.schemeSpecificPart.orEmpty()
+            if (CallAllowlist.denyOutgoingIfBlocked(this, number)) {
+                finish()
+                return
+            }
+
             if (isNumberBlocked(callNumber.toString().replace("tel:", ""), getBlockedNumbers())) {
                 toast(R.string.calling_blocked_number)
                 finish()

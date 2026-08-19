@@ -1,0 +1,13 @@
+Phonly Phone
+https://github.com/StephenSwanick/PhonlyPhone
+
+This program is a fork of Fossify Phone
+(https://github.com/FossifyOrg/Phone), which is licensed under the
+GNU General Public License version 3.
+
+Fossify Phone is copyright its authors and contributors.
+See LICENSE and the upstream repository for the full license text
+and original source.
+
+Kotlin packages remain under the org.fossify.phone namespace.
+The Android application id for this fork is org.phonly.phone.
