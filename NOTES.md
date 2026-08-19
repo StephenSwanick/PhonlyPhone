@@ -13,7 +13,7 @@ Messages / SMS is a later repo (PhonlyMessages). Do not put SMS here.
 - Identity: launcher **Phone_debug** (debug string), About name Phonly Phone, NOTICE/GPL-3 kept.
 - Hardcoded allowlist: `7046180435`, `7047185661`, plus 911 / Android emergency numbers.
 - Outgoing: other numbers do not place a call; toast **Call not allowed**.
-- Incoming (when this app is the **default Phone app**): non-allowlisted callers are rejected by `CallScreeningService`. On T-Mobile that went to **carrier voicemail**.
+- Incoming (when this app is the **default Phone app**): non-allowlisted callers are rejected by `CallScreeningService`. **Confirmed on T-Mobile:** those callers can still **leave a voicemail**. Reject is not enough to prevent VM.
 - Allowlisted inbound/outbound calls work.
 - Fossify “fake version / Play Store” check rewritten at build time so `org.phonly.phone` is accepted.
 - Outgoing intents target this app’s `DialerActivity`, not hardcoded `org.fossify.phone`.
@@ -41,17 +41,26 @@ Product path: Esper/MDM default-dialer policy if they expose it, or a one-time s
 
 ## Visual voicemail
 
-Phonly Phone / Fossify has **no VVM inbox**. Samsung Visual Voicemail is a **separate** app (typically `com.samsung.vvm`). Leave it SHOW in policy and test beside this dialer; do not build cassette-tape VM into this APK.
+Phonly Phone / Fossify has **no VVM inbox**. Do not build one into this APK.
+
+**Samsung Visual Voicemail** is a separate Galaxy app (typically `com.samsung.vvm`). Leave it SHOW in policy if that is the OEM client.
+
+**T-Mobile Visual Voicemail** is on the test unit (separate carrier app). Still needs a playback test for **allowlisted** callers while this dialer is default. Blocked callers already reached carrier VM (see below).
 
 Dialpad long-press 1 is Fossify **speed dial**, not voicemail. Carrier access (`*86`, own MSISDN) is blocked unless added to the allowlist.
 
-## Preventing voicemail (not implemented — pick later)
+## Preventing voicemail (next session: implement app path)
 
-Rejected calls go to carrier VM because screening **rejects** (network treats it as decline).
+**Finding:** a not-allowed incoming call was able to leave VM. Screening **reject** is treated as decline; the carrier still offers voicemail.
 
-1. **Carrier:** turn voicemail off on that T-Mobile line. Reject becomes busy/dead air. Best if the product wants no VM box at all.
-2. **App:** do not reject in `CallScreeningService`. In `CallService`, for a disallowed incoming call, **answer and hang up immediately** (no UI). Most carriers then skip VM. Side effect: a 1-second answered call may bill the caller. Never auto-drop emergency numbers.
-3. Silence without reject still usually hits VM after the no-answer timer. There is no API to delete the carrier VM greeting.
+**Product rule to implement next:** for incoming numbers that fail the allowlist, **answer and hang up immediately** (no ringing UI if we can suppress it) so the call is completed and most carriers skip VM. Keep the same allowlist. **Never** auto-drop 911 / emergency.
+
+How: stop rejecting those calls in `CallScreeningService` (or only skip notification). In `CallService.onCallAdded`, if incoming and `!isNumberAllowed`, answer then disconnect. Expect a ~1s answered call on the caller’s bill; re-test on T-Mobile. Allowlisted inbound must still ring.
+
+Other options (not chosen as the next code change):
+
+1. **Carrier:** turn voicemail off on that T-Mobile line (no VM box at all).
+2. Silence without reject — usually still hits VM after no-answer timeout. No API to delete a carrier greeting.
 
 ## Practical build notes
 
@@ -69,11 +78,11 @@ Rejected calls go to carrier VM because screening **rejects** (network treats it
 
 ## Suggested next (when resuming)
 
-1. More testing: second allowlisted number, 911 only with a safe plan, Samsung VVM app if policy shows it, Dialpad vs recents vs contacts outgoing.
-2. Esper: default dialer + SHOW `com.samsung.vvm`; clone blueprint for experiments, not production Troubleshooter.
-3. Debug launcher label is still `Phone_debug` — optional rename to Phonly Phone.
-4. Incoming answer-and-drop vs carrier VM off — product choice, then implement one.
-5. Hide Samsung Dialer only after default-dialer + inbound/outbound are reliable.
+1. **Implement incoming answer-and-drop** for not-allowed numbers (see above). Rebuild debug APK, sideload, confirm blocked callers cannot leave VM and allowlisted still ring.
+2. T-Mobile VVM app: playback test for allowlisted messages.
+3. Second allowlisted number in/out. Esper default-dialer remains a blueprint problem (no silent in-app switch).
+4. Debug launcher label is still `Phone_debug` — optional rename to Phonly Phone.
+5. Hide Samsung Dialer only after default-dialer + inbound/outbound + VM behavior are reliable.
 6. Release `org.phonly.phone` (no `.debug`), signing, then per-device allowlist reader (no Mongo in the APK).
 7. PhonlyMessages as a second public repo.
 
