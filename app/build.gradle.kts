@@ -73,9 +73,6 @@ android {
     }
 
     buildTypes {
-        debug {
-            applicationIdSuffix = ".debug"
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -122,7 +119,7 @@ android {
         )
     }
 
-    // Install id is APP_ID (org.phonly.phone). Kotlin/R namespace stays Fossify.
+    // Install id is APP_ID (co.phonly.phone). Kotlin/R namespace stays Fossify.
     namespace = "org.fossify.phone"
 
     lint {
@@ -172,7 +169,7 @@ androidComponents {
 
 /**
  * Fossify Commons treats any applicationId other than org.fossify.* as a
- * "fake" app. Rewrite those string checks so org.phonly.phone is accepted.
+ * "fake" app. Rewrite those string checks so co.phonly.phone is accepted.
  */
 abstract class PhonlyFossifyClassVisitorFactory :
     AsmClassVisitorFactory<InstrumentationParameters.None> {
@@ -193,7 +190,7 @@ abstract class PhonlyFossifyClassVisitorFactory :
                 return object : MethodVisitor(Opcodes.ASM9, mv) {
                     override fun visitLdcInsn(value: Any?) {
                         val mapped = when (value) {
-                            "org.fossify." -> "org.phonly."
+                            "org.fossify." -> "co.phonly."
                             "yfissof" -> "ylnohp."
                             else -> value
                         }

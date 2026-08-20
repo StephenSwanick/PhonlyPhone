@@ -13,6 +13,7 @@ import org.fossify.phone.extensions.keyguardManager
 import org.fossify.phone.extensions.powerManager
 import org.fossify.phone.helpers.CallManager
 import org.fossify.phone.helpers.CallNotificationManager
+import org.fossify.phone.helpers.IncomingAllowlistDrop
 import org.fossify.phone.helpers.NoCall
 import org.fossify.phone.models.Events
 import org.greenrobot.eventbus.EventBus
@@ -33,6 +34,11 @@ class CallService : InCallService() {
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
+        if (IncomingAllowlistDrop.isIncomingBlocked(this, call)) {
+            IncomingAllowlistDrop.start(this, call)
+            return
+        }
+
         CallManager.onCallAdded(call)
         CallManager.inCallService = this
         call.registerCallback(callListener)
@@ -67,6 +73,12 @@ class CallService : InCallService() {
 
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
+        if (IncomingAllowlistDrop.onRemoved(call)) {
+            setMuted(false)
+            EventBus.getDefault().post(Events.RefreshCallLog)
+            return
+        }
+
         call.unregisterCallback(callListener)
         val wasPrimaryCall = call == CallManager.getPrimaryCall()
         CallManager.onCallRemoved(call)

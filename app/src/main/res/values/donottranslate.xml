@@ -1,5 +1,7 @@
 <resources>
-    <string name="package_name">org.phonly.phone</string>
+    <string name="package_name">co.phonly.phone</string>
     <string name="app_name">Phonly Phone</string>
     <string name="call_not_allowed">Call not allowed</string>
+    <string name="allowlist_json_title">Allowlist JSON</string>
+    <string name="allowlist_json_description">JSON array of allowlist entries. Phone uses e164 when voice is true.</string>
 </resources>

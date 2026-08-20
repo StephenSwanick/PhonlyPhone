@@ -7,14 +7,26 @@ import org.fossify.commons.extensions.getMyContactsCursor
 import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.commons.helpers.ContactLookupResult
 import org.fossify.commons.helpers.SimpleContactsHelper
+import org.fossify.commons.helpers.isQPlus
 import org.fossify.phone.helpers.CallAllowlist
 
 class SimpleCallScreeningService : CallScreeningService() {
 
     override fun onScreenCall(callDetails: Call.Details) {
         val number = callDetails.handle?.schemeSpecificPart
+        val incoming = !isQPlus() || callDetails.callDirection != Call.Details.DIRECTION_OUTGOING
         if (!CallAllowlist.isNumberAllowed(this, number)) {
-            respondToCall(callDetails, isBlocked = true)
+            if (incoming) {
+                // Let InCallService answer-and-hangup. Reject here still dumps to voicemail.
+                val response = CallResponse.Builder().apply {
+                    if (isQPlus()) {
+                        setSilenceCall(true)
+                    }
+                }.build()
+                respondToCall(callDetails, response)
+            } else {
+                respondToCall(callDetails, isBlocked = true)
+            }
             return
         }
 

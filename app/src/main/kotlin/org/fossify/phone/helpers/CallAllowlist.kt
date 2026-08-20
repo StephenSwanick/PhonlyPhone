@@ -1,23 +1,26 @@
 package org.fossify.phone.helpers
 
 import android.content.Context
+import android.content.RestrictionsManager
 import android.os.Build
 import android.telephony.PhoneNumberUtils
 import android.telephony.TelephonyManager
 import android.widget.Toast
 import org.fossify.phone.R
+import org.json.JSONArray
 
 /**
  * Single gate for outgoing and incoming calls.
  *
- * Spike: hardcoded numbers plus emergency. Later, prefer a pushed
- * per-device list (managed config / local cache from Mongo) when present.
+ * Source of numbers: Esper managed config key [ALLOWLIST_JSON_KEY].
+ * Missing, blank, or invalid JSON → empty list (emergency only).
+ * A present `[]` is also emergency only.
+ *
+ * Incoming: blocked numbers are answered and hung up in [IncomingAllowlistDrop]
+ * so the carrier usually skips voicemail. Do not reject them in screening.
  */
 object CallAllowlist {
-    private val hardcodedNumbers = listOf(
-        "7046180435",
-        "7047185661",
-    )
+    const val ALLOWLIST_JSON_KEY = "allowlist_json"
 
     fun isNumberAllowed(context: Context, rawNumber: String?): Boolean {
         if (rawNumber.isNullOrBlank()) {
@@ -33,7 +36,7 @@ object CallAllowlist {
             return true
         }
 
-        return allowedNumbers().any { matches(number, it) }
+        return allowedNumbers(context).any { matches(number, it) }
     }
 
     /** @return true if the call must not proceed. */
@@ -45,9 +48,40 @@ object CallAllowlist {
         return true
     }
 
-    private fun allowedNumbers(): List<String> {
-        // Later: if a pushed per-device list exists, return that instead.
-        return hardcodedNumbers
+    private fun allowedNumbers(context: Context): List<String> {
+        return readManagedE164s(context)
+    }
+
+    /**
+     * Voice numbers from AppConfig. Empty if unset, blank, `[]`, or invalid JSON.
+     */
+    private fun readManagedE164s(context: Context): List<String> {
+        val restrictions = context.getSystemService(RestrictionsManager::class.java)
+            ?.applicationRestrictions ?: return emptyList()
+        if (!restrictions.containsKey(ALLOWLIST_JSON_KEY)) {
+            return emptyList()
+        }
+        val raw = restrictions.getString(ALLOWLIST_JSON_KEY)?.trim().orEmpty()
+        if (raw.isEmpty()) {
+            return emptyList()
+        }
+        return try {
+            val array = JSONArray(raw)
+            buildList {
+                for (i in 0 until array.length()) {
+                    val obj = array.optJSONObject(i) ?: continue
+                    if (!obj.optBoolean("voice", true)) {
+                        continue
+                    }
+                    val e164 = obj.optString("e164").trim()
+                    if (e164.isNotEmpty()) {
+                        add(e164)
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     private fun isEmergencyNumber(context: Context, number: String): Boolean {
