@@ -18,7 +18,10 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
-val keystorePropertiesFile: File = rootProject.file("keystore.properties")
+val keystorePropertiesFile: File = sequenceOf(
+    File(System.getProperty("user.home"), "AppData/Local/phonly-phone-signing/keystore.properties"),
+    rootProject.file("keystore.properties"),
+).firstOrNull { it.exists() } ?: rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
@@ -74,8 +77,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // First Esper cut: do not minify. ProGuard can break InCall / screening.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -9,15 +9,16 @@ This app stays its own public repo. Not inside PhonlyV1 / Phonly Code.
 Kotlin namespace stays `org.fossify.phone`. Install id is `co.phonly.phone` (debug and release; no `.debug` suffix).  
 Messages / SMS is a later repo (PhonlyMessages, `co.phonly.messages`). Do not put SMS here.
 
-## Status (2026-08-20)
+## Status (2026-08-20, later)
 
-**Proven on AAAAY (Galaxy A16, T-Mobile, V2-DEV).** End-to-end allowlist works.
+**Signed Phone 1.0.0 (`VERSION_CODE` 23) is in the Esper app library and on AAAAY via V2-DEV.** Allowlist still comes from Mongo → Esper AppConfig `allowlist_json`. Same JSON worked on this signed APK (no rebuild).
 
-1. Empty AppConfig → outgoing toast **Call not allowed**; incoming answer-and-hangup; 911 still allowed.
-2. Esper managed config `allowlist_json` with only `+17046180435` → that number in/out works; other numbers fail.
-3. Phonly Code posted the same JSON into Esper Managed Configuration; the phone picked it up (no APK rebuild).
+- Package: `co.phonly.phone`. Launcher **Phone**. Not minified.
+- Signing key: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). Operator has a copy elsewhere. Lose it and we cannot update this package in place.
+- Debug 1.11.1 and this release **cannot** overwrite each other. To swap certs: V2-DEV `allow_app_uninstallation: true`, take Phone **off** the blueprint, CONVERGE, uninstall on device, put signed Phone back, CONVERGE.
+- Scripts (Phonly Code): `esper-phone-upload-v2-dev.mjs`, `esper-phone-replace-signed-aaaaay.mjs`.
 
-Next product step (not this commit): a **signed / polished APK** uploaded to the Esper app library, then default Phone + hide Samsung Dialer on live Home.
+Live Home3, hide Samsung Dialer, and fleet CONVERGE are **not** done.
 
 ## What already works
 
@@ -67,7 +68,7 @@ adb shell cmd role add-role-holder android.app.role.DIALER co.phonly.phone
 On V2-DEV, Settings is SHOW: **Settings → Apps → Choose default apps → Phone app → Phone**.  
 Fleet: Esper/MDM default-dialer if they expose it, or a one-time prompt the blueprint allows. Do not fake a silent in-app switch.
 
-Sideload: Esper blocks `adb uninstall` (`DELETE_FAILED_USER_RESTRICTED`). Use `esper-uninstall-package.mjs` from Phonly Code, then `adb install`. Debug and Play-signed builds of `co.phonly.phone` cannot overwrite each other (different cert).
+Sideload/debug vs Esper-signed: different certificates. Esper blocks `adb uninstall` (`DELETE_FAILED_USER_RESTRICTED`) until V2-DEV allows app uninstallation and Phone is off the blueprint. Then uninstall on the device, restore the library APK, CONVERGE.
 
 ## Visual voicemail
 
@@ -76,15 +77,15 @@ No VVM inbox in this APK. Leave Samsung/T-Mobile Visual Voicemail SHOW if that i
 ## Practical build notes
 
 - `JAVA_HOME` = Android Studio `jbr`, `ANDROID_HOME` = `%LOCALAPPDATA%\Android\Sdk`.
-- `.\gradlew.bat assembleFossDebug` → `%USERPROFILE%\AppData\Local\phonly-phone-build\app\outputs\apk\foss\debug\phone-22-foss-debug.apk`.
+- Debug: `.\gradlew.bat assembleFossDebug` → `%USERPROFILE%\AppData\Local\phonly-phone-build\app\outputs\apk\foss\debug\`.
+- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-23-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). First Esper cut is **not** minified.
 - Build output is **outside Dropbox**. Do not sync `app/build`, `build`, `.gradle` in Dropbox.
-- Do not “Move out of Dropbox” on `.class` files.
 
 ## Suggested next
 
-1. Signed/polished APK → Esper app library (same `co.phonly.phone`). Then CONVERGE / install from Esper, not USB.
-2. Hide Samsung Dialer on live Home only after default Phone is set by policy or setup.
-3. T-Mobile VVM playback for allowlisted callers.
-4. PhonlyMessages (`co.phonly.messages`) reading the same `allowlist_json` (`sms: true`).
+1. Hide Samsung Dialer on live Home only after default Phone is set by policy or setup.
+2. T-Mobile VVM playback for allowlisted callers.
+3. PhonlyMessages (`co.phonly.messages`) reading the same `allowlist_json` (`sms: true`).
+4. Copy V2-DEV Phone posture onto Home when boring. Not this commit.
 
 Do not mix Esper V1=V2 cutover, PhonlyV1 codebase, or Knox Manage into this folder unless asked.
