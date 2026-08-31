@@ -9,6 +9,22 @@ This app stays its own public repo. Not inside PhonlyV1 / Phonly Code.
 Kotlin namespace stays `org.fossify.phone`. Install id is `co.phonly.phone` (debug and release; no `.debug` suffix).  
 Messages / SMS is a later repo (PhonlyMessages, `co.phonly.messages`). Do not put SMS here.
 
+## Status (2026-08-30)
+
+Missed-call overlay **lab-proven on AAAAY** (debug, Esper Home, KSP Appear on top), then signed **1.1.0 / `VERSION_CODE` 24** uploaded. Esper library: `co.phonly.phone`, app `344804b8-04e5-478c-be1a-decc284a0c43`, version `3b07140c-5007-429e-88ca-390f95bb0b35`. **PhonlyV2 - DEV published v25.0** SHOWing it. Esper UI: version `1.1.0`, version code `24`, release tag `0`. Signed 1.0.0 / 23 remains in the library unused.
+
+**Lab:** one white top bar; same person → count; second caller → “and others”. Tap / Recents clears. Allowlist drops stay silent. Phone **powered off** → carrier VM, **no** overlay after boot (correct: `CallService` never ran). Operator saw a shade **voicemail** notification after boot (T-Mobile VVM / system). Kids on live Home may not have shade.
+
+**Look:** one white heads-up bar at the top (below status icons). Photo or Phone icon; **Missed call** + name. Same person updates in place (`Mom, 3 missed calls`). Different people stay one bar (`Mom and 1 other`). No bubbles, no stack, no swipe-to-dismiss, no timeout.
+
+**Dismiss:** tap the bar or open Recents. Miss stays in Recents. Declined calls (`REJECTED` / `LOCAL`) do not show a bar.
+
+**Grant:** fleet KSP Permission Controls Appear on top → `co.phonly.phone` and `co.phonly.messages`. Do not open Settings if the grant is missing.
+
+**Code:** `SYSTEM_ALERT_WINDOW` + `MissedCallOverlay` / `MissedCallOverlayService`. Persist unacked misses; re-show after process death / boot **only if this app already recorded the miss**. Hook `CallService.onCallRemoved`.
+
+**Do not:** fleet CONVERGE or copy to live Home unless asked. Debug 24 and signed 24 **cannot** overwrite each other. After Esper install, set default Phone again (`ROLE_DIALER` drops on uninstall). Operator was to CONVERGE **AAAAY only** after debug was gone — confirm on-device version before treating signed 24 as live on that unit.
+
 ## Status (2026-08-20, later)
 
 **Signed Phone 1.0.0 (`VERSION_CODE` 23) is in the Esper app library and on AAAAY via V2-DEV.** Allowlist still comes from Mongo → Esper AppConfig `allowlist_json`. Same JSON worked on this signed APK (no rebuild).
@@ -30,6 +46,7 @@ Live Home3, hide Samsung Dialer, and fleet CONVERGE are **not** done.
 - Outgoing intents target this app’s `DialerActivity`.
 - Default launcher icon is the Phonly brandmark. Fossify color-icon variants in Customize are still the old handset.
 - Crash fix: keep `color_incoming_call` in `colors.xml`.
+- Missed-call top bar (debug 1.1.0 / 24, AAAAY 2026-08-30): allowlisted miss over Home; count + “and others”; tap/Recents clears. Powered-off call is VM, not this bar.
 
 ## Allowlist
 
@@ -78,16 +95,15 @@ No VVM inbox in this APK. Leave Samsung/T-Mobile Visual Voicemail SHOW if that i
 
 - `JAVA_HOME` = Android Studio `jbr`, `ANDROID_HOME` = `%LOCALAPPDATA%\Android\Sdk`.
 - Debug: `.\gradlew.bat assembleFossDebug` → `%USERPROFILE%\AppData\Local\phonly-phone-build\app\outputs\apk\foss\debug\`.
-- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-23-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). First Esper cut is **not** minified.
+- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-24-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). Do not minify. Upload helper in Phonly Code: `esper-phone-upload-v2-dev.mjs`.
 - Build output is **outside Dropbox**. Do not sync `app/build`, `build`, `.gradle` in Dropbox.
 
 ## Suggested next
 
-1. **Next session:** missed-call overlay in this APK, sideload to a lab unit. See below. Do not Esper-sign, library-upload, or CONVERGE unless asked.
+1. Confirm AAAAY is on **signed** 1.1.0 / 24 (not leftover debug) and default Phone is set. Optional lab: reboot with a still-unacked miss; Home↔School. Then copy V2 Phone onto live Home **only if asked**.
 2. Hide Samsung Dialer on live Home only after default Phone is set by policy or setup.
 3. T-Mobile VVM playback for allowlisted callers.
-4. PhonlyMessages (`co.phonly.messages`) — sibling folder `..\Phonly Messages`, frozen Fossify at `25971576`. Work happens there, not here.
-5. Copy V2-DEV Phone posture onto Home when boring. Not this commit.
+4. PhonlyMessages (`co.phonly.messages`) — sibling folder `..\Phonly Messages`. Work happens there, not here.
 
 Do not mix Esper V1=V2 cutover, PhonlyV1 codebase, or Knox Manage into this folder unless asked.
 
@@ -95,7 +111,7 @@ Do not mix Esper V1=V2 cutover, PhonlyV1 codebase, or Knox Manage into this fold
 
 **Product:** one small **Missed call** bar on top of whatever is on screen (Home, another app) until the kid taps it or opens Recents. Allowlisted misses only. `IncomingAllowlistDrop` stays silent. Not a 2-second heads-up. Kids have no Settings and no notification shade.
 
-Messages wants the same kind of bar for unread texts (`co.phonly.messages`). Do not put SMS here; keep the overlay grant and lab-prove story aligned. One pattern for both apps.
+Messages shipped unread **bubbles** (`co.phonly.messages` 1.1.0). Phone stays a top bar so the two do not fight. Do not put SMS here.
 
 **Look**
 
@@ -110,34 +126,16 @@ Left to right: round photo if we have one, else the Phone icon; two lines — **
 - Tap opens Recents. Opening Recents clears the bar. Call-back of the latest is optional, not a second bar.
 - Do not pile cards. Do not one-chip-per-caller (covers Home; fights the unread-text bar).
 
-**This APK today**
+**This APK today (1.1.0 / 24)**
 
-- Declares `SYSTEM_ALERT_WINDOW`. Does **not** post its own missed-call banner. After a miss, the system Telecom notifier is shade UI; we only `cancelMissedCallsNotification()` when Recents is opened.
+- `SYSTEM_ALERT_WINDOW` + `MissedCallOverlay` top bar. Allowlisted misses only. `IncomingAllowlistDrop` stays silent. Declined calls do not show a bar.
 - Fossify overlay snackbar / `ACTION_MANAGE_OVERLAY_PERMISSION` sends the kid to Settings. Dead on live Home. **Do not** use that for this feature.
-- Incoming/in-call notifications already exist (`CallNotificationManager`). That is live-call UI, not a missed-call card.
+- Incoming/in-call notifications (`CallNotificationManager`) are live-call UI, not this missed-call card.
 
-**Grant (not this repo; nothing granted yet)**
+**Grant (done 2026-08-30, operator):** fleet KSP Permission Controls Appear on top → `co.phonly.phone` and `co.phonly.messages`. Blueprint cannot grant this. Keep it on the fleet KSP profile. Home overlay proven on AAAAY (debug). Reboot-with-unacked-miss and Home↔School still optional.
 
-- Esper blueprint / console / `SET_APP_PERMISSION` cannot grant Display over other apps. That API is runtime only (camera, mic, `POST_NOTIFICATIONS`, …). Overlay is AppOps.
-- Silent A16 path: Esper **Knox Service Plugin** iframe (same Play Store MCM as fleet RCS / battery — not a blueprint Save, not slim `UPDATE_DEVICE_CONFIG` JSON). Device-wide + application management controls are already on. Turn on **Enable permission controls**. Permission Controls row: policy **Appear on top**, package `co.phonly.phone`. Later a second row for `co.phonly.messages`.
-- KSP 24.03+, Android 13+, fully managed; no user prompt; re-applied when the package is installed. A16 qualifies. A14 / One UI Core does not (KPE 90010).
-- Survives reboot and Home↔School CONVERGE if it stays on the **fleet** KSP profile. Overwriting that iframe can remove it. Publishing Home3 does not create it.
-- Do not embed Esper Device SDK `setAppOpMode` in this GPL repo.
-- Backup ongoing notification needs an explicit Esper runtime grant of `POST_NOTIFICATIONS` (blueprint Allow Automatically, or `SET_APP_PERMISSION` on this package). `ROLE_DIALER` / CallStyle does **not** cover a generic ongoing notification. KSP “Notification access” is NotificationListener — wrong. Do not use KSP notification allowlist (blocks everyone else). If the blueprint is Ask User, the kid cannot tap Allow.
+**Lab prove (done on Home; V2-DEV, not live Home3)**
 
-**Lab prove (ship-blocker; V2-DEV / Troubleshooter, not live Home3)**
-
-Grant ≠ draw over Esper Home. Units are Esper Launcher multi-app, not Phone pinned as single-app kiosk. If Appear on top is granted and the card is a real `TYPE_APPLICATION_OVERLAY` window, it should show; some lock-task launchers still hide third-party overlays. Prove: card over Home, after reboot, after Home↔School. If Home eats it, the floating card cannot ship.
+Grant ≠ draw over Esper Home. Proven: `TYPE_APPLICATION_OVERLAY` bar over Esper Home on AAAAY. Optional leftover: reboot re-show, Home↔School. If a later Home CONVERGE eats it, stop.
 
 Samsung Floating notifications / Smart pop-up / chat bubbles need Settings. Not a path. Not a substitute.
-
-**Next session (this repo)**
-
-Sideload a variant of Phonly Phone. Debug and this signed release **cannot** overwrite each other (see Status). Keep package `co.phonly.phone`. Do not live-Home CONVERGE.
-
-- On allowlisted incoming disconnect as missed (not reject, not allowlist drop): show or update the single overlay bar (see Look / Many misses).
-- Tap → Recents. Opening Recents clears it. No swipe-to-dismiss that leaves the miss with nothing on screen.
-- If overlay AppOps is missing: **do not** open Settings. Ongoing notification only.
-- Re-show after process death / boot if still unacknowledged.
-- Pair with `setOngoing(true)` notification; cancel with the bar.
-- Fallback if overlay cannot sit on Home: status-bar mark only. Weak (fleet notification volume is 0; no shade). Not the product.

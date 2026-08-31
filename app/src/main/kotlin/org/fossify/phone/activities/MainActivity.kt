@@ -41,6 +41,7 @@ import org.fossify.phone.fragments.FavoritesFragment
 import org.fossify.phone.fragments.MyViewPagerFragment
 import org.fossify.phone.fragments.RecentsFragment
 import org.fossify.phone.helpers.OPEN_DIAL_PAD_AT_LAUNCH
+import org.fossify.phone.helpers.MissedCallOverlay
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.helpers.tabsList
 import org.fossify.phone.models.Events
@@ -148,6 +149,7 @@ class MainActivity : SimpleActivity() {
         Handler().postDelayed({
             getRecentsFragment()?.refreshItems()
         }, 2000)
+        syncMissedCallOverlay()
     }
 
     override fun onPause() {
@@ -155,6 +157,7 @@ class MainActivity : SimpleActivity() {
         storedShowTabs = config.showTabs
         storedStartNameWithSurname = config.startNameWithSurname
         config.lastUsedViewPagerPage = binding.viewPager.currentItem
+        MissedCallOverlay.setRecentsVisible(this, false)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
@@ -381,6 +384,7 @@ class MainActivity : SimpleActivity() {
                     it?.finishActMode()
                 }
                 refreshMenuItems()
+                syncMissedCallOverlay()
             }
         })
 
@@ -440,6 +444,7 @@ class MainActivity : SimpleActivity() {
                 if (it.position == lastPosition && config.showTabs and TAB_CALL_HISTORY > 0) {
                     clearMissedCalls()
                 }
+                syncMissedCallOverlay()
             }
         )
 
@@ -525,6 +530,16 @@ class MainActivity : SimpleActivity() {
     private fun getFavoritesFragment(): FavoritesFragment? = findViewById(R.id.favorites_fragment)
 
     private fun getRecentsFragment(): RecentsFragment? = findViewById(R.id.recents_fragment)
+
+    private fun isRecentsTabSelected(): Boolean {
+        return config.showTabs and TAB_CALL_HISTORY > 0 &&
+            binding.mainTabsHolder.tabCount > 0 &&
+            binding.viewPager.currentItem == binding.mainTabsHolder.tabCount - 1
+    }
+
+    private fun syncMissedCallOverlay() {
+        MissedCallOverlay.setRecentsVisible(this, isRecentsTabSelected())
+    }
 
     private fun getDefaultTab(): Int {
         val showTabsMask = config.showTabs

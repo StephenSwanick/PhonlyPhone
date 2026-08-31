@@ -14,6 +14,7 @@ import org.fossify.phone.extensions.powerManager
 import org.fossify.phone.helpers.CallManager
 import org.fossify.phone.helpers.CallNotificationManager
 import org.fossify.phone.helpers.IncomingAllowlistDrop
+import org.fossify.phone.helpers.MissedCallOverlay
 import org.fossify.phone.helpers.NoCall
 import org.fossify.phone.models.Events
 import org.greenrobot.eventbus.EventBus
@@ -78,6 +79,8 @@ class CallService : InCallService() {
             EventBus.getDefault().post(Events.RefreshCallLog)
             return
         }
+
+        MissedCallOverlay.onCallRemoved(this, call)
 
         call.unregisterCallback(callListener)
         val wasPrimaryCall = call == CallManager.getPrimaryCall()
