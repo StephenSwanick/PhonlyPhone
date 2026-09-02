@@ -13,6 +13,7 @@ import org.fossify.phone.extensions.keyguardManager
 import org.fossify.phone.extensions.powerManager
 import org.fossify.phone.helpers.CallManager
 import org.fossify.phone.helpers.CallNotificationManager
+import org.fossify.phone.helpers.DeviceNotificationCue
 import org.fossify.phone.helpers.IncomingAllowlistDrop
 import org.fossify.phone.helpers.MissedCallOverlay
 import org.fossify.phone.helpers.NoCall
@@ -25,6 +26,7 @@ class CallService : InCallService() {
     private val callListener = object : Call.Callback() {
         override fun onStateChanged(call: Call, state: Int) {
             super.onStateChanged(call, state)
+            DeviceNotificationCue.onCallStateChanged(call, state)
             if (state == Call.STATE_DISCONNECTED || state == Call.STATE_DISCONNECTING) {
                 callNotificationManager.cancelNotification()
             } else {
@@ -80,7 +82,7 @@ class CallService : InCallService() {
             return
         }
 
-        MissedCallOverlay.onCallRemoved(this, call)
+        DeviceNotificationCue.onCallRemoved(this, call)
 
         call.unregisterCallback(callListener)
         val wasPrimaryCall = call == CallManager.getPrimaryCall()

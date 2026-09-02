@@ -40,6 +40,7 @@ import org.fossify.phone.fragments.ContactsFragment
 import org.fossify.phone.fragments.FavoritesFragment
 import org.fossify.phone.fragments.MyViewPagerFragment
 import org.fossify.phone.fragments.RecentsFragment
+import org.fossify.phone.helpers.DeviceNotificationCue
 import org.fossify.phone.helpers.OPEN_DIAL_PAD_AT_LAUNCH
 import org.fossify.phone.helpers.MissedCallOverlay
 import org.fossify.phone.helpers.RecentsHelper
@@ -149,7 +150,7 @@ class MainActivity : SimpleActivity() {
         Handler().postDelayed({
             getRecentsFragment()?.refreshItems()
         }, 2000)
-        syncMissedCallOverlay()
+        syncRecentsCue()
     }
 
     override fun onPause() {
@@ -157,7 +158,7 @@ class MainActivity : SimpleActivity() {
         storedShowTabs = config.showTabs
         storedStartNameWithSurname = config.startNameWithSurname
         config.lastUsedViewPagerPage = binding.viewPager.currentItem
-        MissedCallOverlay.setRecentsVisible(this, false)
+        DeviceNotificationCue.setRecentsVisible(this, false)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
@@ -384,7 +385,7 @@ class MainActivity : SimpleActivity() {
                     it?.finishActMode()
                 }
                 refreshMenuItems()
-                syncMissedCallOverlay()
+                syncRecentsCue()
             }
         })
 
@@ -400,6 +401,7 @@ class MainActivity : SimpleActivity() {
 
                 binding.mainTabsHolder.getTabAt(wantedTab)?.select()
                 refreshMenuItems()
+                syncRecentsCue()
             }, 100L)
         }
 
@@ -444,7 +446,7 @@ class MainActivity : SimpleActivity() {
                 if (it.position == lastPosition && config.showTabs and TAB_CALL_HISTORY > 0) {
                     clearMissedCalls()
                 }
-                syncMissedCallOverlay()
+                syncRecentsCue()
             }
         )
 
@@ -537,8 +539,8 @@ class MainActivity : SimpleActivity() {
             binding.viewPager.currentItem == binding.mainTabsHolder.tabCount - 1
     }
 
-    private fun syncMissedCallOverlay() {
-        MissedCallOverlay.setRecentsVisible(this, isRecentsTabSelected())
+    private fun syncRecentsCue() {
+        DeviceNotificationCue.setRecentsVisible(this, isRecentsTabSelected())
     }
 
     private fun getDefaultTab(): Int {

@@ -8,4 +8,6 @@
     <string name="missed_call_and_others">%1$s and %2$d others</string>
     <string name="allowlist_json_title">Allowlist JSON</string>
     <string name="allowlist_json_description">JSON array of allowlist entries. Phone uses e164 when voice is true.</string>
+    <string name="device_imei_title">Device IMEI</string>
+    <string name="device_imei_description">14–16 digit IMEI from Mongo. Used only to report pile/looked/clear. Not shown to the kid.</string>
 </resources>

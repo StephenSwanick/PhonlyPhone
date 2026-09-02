@@ -34,6 +34,64 @@ fun hasSigningVars(): Boolean {
             && providers.environmentVariable("SIGNING_STORE_PASSWORD").orNull != null
 }
 
+fun loadNotificationProperties(): Properties {
+    val properties = Properties()
+    sequenceOf(
+        File(System.getProperty("user.home"), "AppData/Local/phonly-phone-signing/notification.properties"),
+        rootProject.file("notification.properties"),
+        rootProject.file("local.properties"),
+    ).filter { it.exists() }.forEach { file ->
+        FileInputStream(file).use { properties.load(it) }
+    }
+    return properties
+}
+
+fun notificationApiUrl(): String {
+    val env = sequenceOf(
+        System.getenv("NOTIFICATION_API_BASE"),
+        System.getenv("NOTIFICATION_API_URL"),
+    ).firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+    if (env.isNotEmpty()) return env
+    val fromFile = loadNotificationProperties()
+    val fileUrl = sequenceOf(
+        fromFile.getProperty("notification.apiUrl"),
+        fromFile.getProperty("NOTIFICATION_API_BASE"),
+        fromFile.getProperty("NOTIFICATION_API_URL"),
+    ).firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+    return fileUrl.ifEmpty { "https://phonlyv1.onrender.com" }
+}
+
+fun notificationToken(): String {
+    val env = sequenceOf(
+        System.getenv("NOTIFICATION_SECRET"),
+        System.getenv("DEVICE_NOTIFICATION_LAB_TOKEN"),
+    ).firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+    if (env.isNotEmpty()) return env
+    val fromFile = loadNotificationProperties()
+    return sequenceOf(
+        fromFile.getProperty("NOTIFICATION_SECRET"),
+        fromFile.getProperty("token"),
+        fromFile.getProperty("notification.token"),
+        fromFile.getProperty("DEVICE_NOTIFICATION_LAB_TOKEN"),
+    ).firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+}
+
+fun deviceImeiOverride(): String {
+    val env = System.getenv("DEVICE_IMEI")?.trim().orEmpty()
+    if (env.isNotEmpty()) return env
+    val fromFile = loadNotificationProperties()
+    return sequenceOf(
+        fromFile.getProperty("imei"),
+        fromFile.getProperty("DEVICE_IMEI"),
+    ).firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+}
+
+fun escapeBuildConfigString(value: String): String {
+    return value.replace("\\", "\\\\").replace("\"", "\\\"")
+}
+
+val debugKeystoreFile = File(System.getProperty("user.home"), ".android/debug.keystore")
+
 base {
     val versionCode = project.property("VERSION_CODE").toString().toInt()
     archivesName = "phone-$versionCode"
@@ -48,9 +106,32 @@ android {
         targetSdk = project.libs.versions.app.build.targetSDK.get().toInt()
         versionName = project.property("VERSION_NAME").toString()
         versionCode = project.property("VERSION_CODE").toString().toInt()
+        buildConfigField(
+            "String",
+            "NOTIFICATION_API_URL",
+            "\"${escapeBuildConfigString(notificationApiUrl())}\""
+        )
+        buildConfigField(
+            "String",
+            "NOTIFICATION_TOKEN",
+            "\"${escapeBuildConfigString(notificationToken())}\""
+        )
+        buildConfigField(
+            "String",
+            "DEVICE_IMEI_OVERRIDE",
+            "\"${escapeBuildConfigString(deviceImeiOverride())}\""
+        )
     }
 
     signingConfigs {
+        if (debugKeystoreFile.exists()) {
+            register("phonlyDebug") {
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+                storeFile = debugKeystoreFile
+                storePassword = "android"
+            }
+        }
         if (keystorePropertiesFile.exists()) {
             register("release") {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
@@ -76,6 +157,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Same debug.keystore as Messages so signature permission works.
+            // Keep applicationId = co.phonly.phone (no .debug suffix).
+            if (debugKeystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("phonlyDebug")
+            }
+        }
         release {
             // First Esper cut: do not minify. ProGuard can break InCall / screening.
             isMinifyEnabled = false
@@ -87,6 +175,8 @@ android {
             if (keystorePropertiesFile.exists() || hasSigningVars()) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            // Do not bake AAAAY IMEI into a signed library APK.
+            buildConfigField("String", "DEVICE_IMEI_OVERRIDE", "\"\"")
         }
     }
 
