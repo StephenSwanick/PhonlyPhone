@@ -6,4 +6,10 @@
         android:description="@string/allowlist_json_description"
         android:restrictionType="string"
         android:defaultValue="" />
+    <restriction
+        android:key="device_imei"
+        android:title="@string/device_imei_title"
+        android:description="@string/device_imei_description"
+        android:restrictionType="string"
+        android:defaultValue="" />
 </restrictions>

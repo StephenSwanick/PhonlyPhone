@@ -40,6 +40,7 @@ import org.fossify.phone.fragments.ContactsFragment
 import org.fossify.phone.fragments.FavoritesFragment
 import org.fossify.phone.fragments.MyViewPagerFragment
 import org.fossify.phone.fragments.RecentsFragment
+import org.fossify.phone.helpers.DeviceNotificationCue
 import org.fossify.phone.helpers.OPEN_DIAL_PAD_AT_LAUNCH
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.helpers.tabsList
@@ -148,6 +149,7 @@ class MainActivity : SimpleActivity() {
         Handler().postDelayed({
             getRecentsFragment()?.refreshItems()
         }, 2000)
+        syncRecentsCue()
     }
 
     override fun onPause() {
@@ -155,6 +157,7 @@ class MainActivity : SimpleActivity() {
         storedShowTabs = config.showTabs
         storedStartNameWithSurname = config.startNameWithSurname
         config.lastUsedViewPagerPage = binding.viewPager.currentItem
+        DeviceNotificationCue.setRecentsVisible(this, false)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
@@ -381,6 +384,7 @@ class MainActivity : SimpleActivity() {
                     it?.finishActMode()
                 }
                 refreshMenuItems()
+                syncRecentsCue()
             }
         })
 
@@ -396,6 +400,7 @@ class MainActivity : SimpleActivity() {
 
                 binding.mainTabsHolder.getTabAt(wantedTab)?.select()
                 refreshMenuItems()
+                syncRecentsCue()
             }, 100L)
         }
 
@@ -440,6 +445,7 @@ class MainActivity : SimpleActivity() {
                 if (it.position == lastPosition && config.showTabs and TAB_CALL_HISTORY > 0) {
                     clearMissedCalls()
                 }
+                syncRecentsCue()
             }
         )
 
@@ -525,6 +531,16 @@ class MainActivity : SimpleActivity() {
     private fun getFavoritesFragment(): FavoritesFragment? = findViewById(R.id.favorites_fragment)
 
     private fun getRecentsFragment(): RecentsFragment? = findViewById(R.id.recents_fragment)
+
+    private fun isRecentsTabSelected(): Boolean {
+        return config.showTabs and TAB_CALL_HISTORY > 0 &&
+            binding.mainTabsHolder.tabCount > 0 &&
+            binding.viewPager.currentItem == binding.mainTabsHolder.tabCount - 1
+    }
+
+    private fun syncRecentsCue() {
+        DeviceNotificationCue.setRecentsVisible(this, isRecentsTabSelected())
+    }
 
     private fun getDefaultTab(): Int {
         val showTabsMask = config.showTabs

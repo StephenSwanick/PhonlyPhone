@@ -17,11 +17,19 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.telecom.action.CONFIGURE_PHONE_ACCOUNT" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <permission
+        android:name="co.phonly.permission.NOTIFICATION"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="co.phonly.permission.NOTIFICATION" />
 
     <uses-permission
         android:name="android.permission.USE_FINGERPRINT"
@@ -30,6 +38,7 @@
     <queries>
         <package android:name="org.fossify.contacts.debug" />
         <package android:name="org.fossify.contacts" />
+        <package android:name="co.phonly.messages" />
 
         <!-- Required for loading contact accounts -->
         <intent>
@@ -38,7 +47,7 @@
     </queries>
 
     <application
-        android:name="org.fossify.commons.FossifyApp"
+        android:name=".App"
         android:allowBackup="true"
         android:appCategory="productivity"
         android:icon="@mipmap/ic_launcher"
@@ -199,6 +208,27 @@
             android:name=".receivers.CallActionReceiver"
             android:enabled="true"
             android:exported="false" />
+
+        <receiver
+            android:name=".receivers.DeviceNotificationCueReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="co.phonly.permission.NOTIFICATION">
+            <intent-filter>
+                <action android:name="co.phonly.intent.NOTIFICATION_LOOKED" />
+                <action android:name="co.phonly.intent.NOTIFICATION_LEFT" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".receivers.DeviceNotificationBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <activity-alias
             android:name=".activities.SplashActivity.Red"
