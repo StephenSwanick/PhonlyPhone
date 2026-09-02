@@ -25,16 +25,44 @@ import java.nio.charset.StandardCharsets
 /**
  * Phone reports pile / looked / clear only. No caller id on the wire.
  * PhonlyAPI owns the wait and NOTIFY_DEVICE.
+ * Slot JSON is cardStatus / reminderStartedAt / cardShownAt only.
  */
 internal object DeviceNotificationApi {
     const val TAG = "PhonlyCue"
     const val SOURCE = "phone"
 
+    enum class CardStatus {
+        IDLE, WAITING, SHOWN;
+
+        val wire: String
+            get() = when (this) {
+                IDLE -> "idle"
+                WAITING -> "waiting"
+                SHOWN -> "shown"
+            }
+
+        companion object {
+            fun fromWire(raw: String?): CardStatus = when (raw?.trim()) {
+                "waiting" -> WAITING
+                "shown" -> SHOWN
+                else -> IDLE
+            }
+        }
+    }
+
     data class RemoteState(
-        val alreadySent: Boolean,
-        val waitingSince: String?,
-        val sentAt: String?,
-    )
+        val cardStatus: CardStatus,
+        val reminderStartedAt: String?,
+        val cardShownAt: String?,
+    ) {
+        companion object {
+            fun idle(cardShownAt: String? = null) = RemoteState(
+                cardStatus = CardStatus.IDLE,
+                reminderStartedAt = null,
+                cardShownAt = cardShownAt,
+            )
+        }
+    }
 
     data class Attempt(
         val state: RemoteState?,
@@ -222,26 +250,40 @@ internal object DeviceNotificationApi {
 
     private fun parseState(raw: String): RemoteState? {
         if (raw.isBlank()) {
-            return RemoteState(alreadySent = false, waitingSince = null, sentAt = null)
+            return RemoteState.idle()
         }
         return try {
             val root = JSONObject(raw)
             if (root.isNull("notification")) {
-                return RemoteState(alreadySent = false, waitingSince = null, sentAt = null)
+                return RemoteState.idle()
             }
             val notification = root.optJSONObject("notification")
-                ?: return RemoteState(alreadySent = false, waitingSince = null, sentAt = null)
+                ?: return RemoteState.idle()
             // GET ?source=phone returns the phone slot as `notification`. Nested
             // `notification.phone` is the permanent two-slot document.
             val slot = notification.optJSONObject(SOURCE) ?: notification
-            RemoteState(
-                alreadySent = slot.optBoolean("alreadySent", false),
-                waitingSince = jsonStringOrNull(slot, "waitingSince"),
-                sentAt = jsonStringOrNull(slot, "sentAt"),
-            )
+            parseSlot(slot)
         } catch (t: Throwable) {
             Log.w(TAG, "parse ${t.message}")
             null
+        }
+    }
+
+    /** PhonlyAPI slot: cardStatus / reminderStartedAt / cardShownAt only. */
+    private fun parseSlot(slot: JSONObject): RemoteState {
+        val status = CardStatus.fromWire(jsonStringOrNull(slot, "cardStatus"))
+        val cardShownAt = jsonStringOrNull(slot, "cardShownAt")
+        val reminderStartedAt = jsonStringOrNull(slot, "reminderStartedAt")
+        return when (status) {
+            CardStatus.WAITING -> {
+                if (reminderStartedAt == null) {
+                    RemoteState.idle(cardShownAt)
+                } else {
+                    RemoteState(CardStatus.WAITING, reminderStartedAt, cardShownAt)
+                }
+            }
+            CardStatus.SHOWN -> RemoteState(CardStatus.SHOWN, null, cardShownAt)
+            CardStatus.IDLE -> RemoteState.idle(cardShownAt)
         }
     }
 

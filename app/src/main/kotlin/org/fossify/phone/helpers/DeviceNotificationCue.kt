@@ -28,7 +28,7 @@ import java.util.concurrent.Executors
  * Recents = Call history tab in front. On AAAAY, launching Phone is that tab.
  * Recents open → POST /looked source=phone. Home / leave → LEFT: remaining unacked
  * → POST /pile; after we acked our misses → POST /clear (API will not touch messages).
- * Inbox LOOKED/LEFT is ignored. Extra POSTs while alreadySent stay quiet at the API.
+ * Inbox LOOKED/LEFT is ignored. Extra pile while shown does not restart the wait.
  */
 object DeviceNotificationCue {
     const val PERMISSION = "co.phonly.permission.NOTIFICATION"
@@ -39,6 +39,9 @@ object DeviceNotificationCue {
     private const val KEY_UNACKED = "unacked_count"
     private const val KEY_PILED = "piled_this_cycle"
     private const val KEY_LAST_MISSED_ID = "last_missed_call_id"
+    private const val KEY_CARD_STATUS = "cardStatus"
+    private const val KEY_REMINDER_STARTED_AT = "reminderStartedAt"
+    private const val KEY_CARD_SHOWN_AT = "cardShownAt"
     private const val PILE_DEBOUNCE_MS = 8_000L
     private const val PILE_RETRY_MS = 15_000L
     private const val CALL_LOG_SWEEP_MS = 2_500L
@@ -54,6 +57,15 @@ object DeviceNotificationCue {
 
     @Volatile
     private var recentsForeground = false
+
+    @Volatile
+    private var cardStatus = DeviceNotificationApi.CardStatus.IDLE
+
+    @Volatile
+    private var reminderStartedAt: String? = null
+
+    @Volatile
+    private var cardShownAt: String? = null
 
     @Volatile
     private var owedClear = false
@@ -109,6 +121,7 @@ object DeviceNotificationCue {
     fun onProcessStart(context: Context) {
         val app = context.applicationContext
         pileApp = app
+        loadCache(app)
         watchCallLog(app)
         snapshotMissedCallLog(app)
         io.execute {
@@ -210,11 +223,14 @@ object DeviceNotificationCue {
             }
             writePiled(context, false)
         }
+        applyIdle()
+        persistCache(context)
         if (postLooked) {
             io.execute {
                 try {
                     val state = DeviceNotificationApi.looked(context)
                     logRemote("LOOKED", state)
+                    applyServer(context, state)
                 } catch (t: Throwable) {
                     Log.w(DeviceNotificationApi.TAG, "LOOKED ${t.message}")
                 }
@@ -233,10 +249,13 @@ object DeviceNotificationCue {
         if (!shouldClear) {
             return
         }
+        applyIdle()
+        persistCache(context)
         io.execute {
             try {
                 val state = DeviceNotificationApi.clear(context)
                 logRemote("CLEAR", state)
+                applyServer(context, state)
             } catch (t: Throwable) {
                 Log.w(DeviceNotificationApi.TAG, "CLEAR ${t.message}")
             }
@@ -251,6 +270,9 @@ object DeviceNotificationCue {
         }
         val state = DeviceNotificationApi.getState(context)
         logRemote("GET", state)
+        if (state != null) {
+            applyServer(context, state)
+        }
         if (gen != lookGeneration) {
             Log.i(DeviceNotificationApi.TAG, "boot GET stale; looked won")
             return
@@ -261,9 +283,23 @@ object DeviceNotificationCue {
         if (!hasUnacked(context)) {
             return
         }
-        // Do not skip on GET alreadySent / waitingSince. Those go stale after
-        // LOOKED. Extra POSTs are harmless: the API does not restart a wait.
-        schedulePile(context)
+        // shown → boot stays quiet. waiting → reminder already open.
+        // idle → may pile. GET miss keeps the local cache (extra pile is
+        // harmless if the API is already waiting or shown).
+        when (cardStatus) {
+            DeviceNotificationApi.CardStatus.SHOWN -> {
+                Log.i(DeviceNotificationApi.TAG, "boot: shown; stay quiet")
+            }
+            DeviceNotificationApi.CardStatus.WAITING -> {
+                Log.i(DeviceNotificationApi.TAG, "boot: already waiting")
+            }
+            DeviceNotificationApi.CardStatus.IDLE -> {
+                if (state == null) {
+                    Log.i(DeviceNotificationApi.TAG, "boot: GET miss; pile if Recents is not in front")
+                }
+                schedulePile(context)
+            }
+        }
     }
 
     private fun noteMiss(context: Context) {
@@ -411,8 +447,8 @@ object DeviceNotificationCue {
             }
             pileApp = app
             // Call-log / network ticks must not restart the 8s timer. Extra
-            // POSTs while alreadySent are harmless; the API does not restart
-            // the phone wait. Do not skip on VALIDATED.
+            // POSTs while shown are harmless; the API does not restart the
+            // phone wait. Do not skip on VALIDATED.
             if (pileDebouncePending) {
                 Log.i(DeviceNotificationApi.TAG, "pile debounce kept")
                 return
@@ -528,7 +564,9 @@ object DeviceNotificationCue {
                     }
                     if (attempt.state != null) {
                         try {
-                            logRemote("LOOKED", DeviceNotificationApi.looked(context))
+                            val looked = DeviceNotificationApi.looked(context)
+                            logRemote("LOOKED", looked)
+                            applyServer(context, looked)
                         } catch (t: Throwable) {
                             Log.w(DeviceNotificationApi.TAG, "LOOKED ${t.message}")
                         }
@@ -536,6 +574,7 @@ object DeviceNotificationCue {
                     return@execute
                 }
                 logRemote("PILE", attempt.state)
+                applyServer(context, attempt.state)
                 synchronized(lock) {
                     pilePosted = false
                     writePiled(context, attempt.state != null)
@@ -586,6 +625,46 @@ object DeviceNotificationCue {
         cuePrefs(context).edit().putBoolean(KEY_PILED, value).apply()
     }
 
+    private fun applyIdle() {
+        cardStatus = DeviceNotificationApi.CardStatus.IDLE
+        reminderStartedAt = null
+    }
+
+    private fun applyServer(context: Context, state: DeviceNotificationApi.RemoteState?) {
+        if (state == null) {
+            return
+        }
+        cardStatus = state.cardStatus
+        reminderStartedAt = if (state.cardStatus == DeviceNotificationApi.CardStatus.WAITING) {
+            state.reminderStartedAt
+        } else {
+            null
+        }
+        cardShownAt = state.cardShownAt
+        persistCache(context)
+    }
+
+    private fun loadCache(context: Context) {
+        val prefs = cuePrefs(context)
+        cardStatus = DeviceNotificationApi.CardStatus.fromWire(prefs.getString(KEY_CARD_STATUS, null))
+        reminderStartedAt = prefs.getString(KEY_REMINDER_STARTED_AT, null)
+        cardShownAt = prefs.getString(KEY_CARD_SHOWN_AT, null)
+        if (cardStatus != DeviceNotificationApi.CardStatus.WAITING) {
+            reminderStartedAt = null
+        }
+    }
+
+    private fun persistCache(context: Context) {
+        cuePrefs(context).edit()
+            .putString(KEY_CARD_STATUS, cardStatus.wire)
+            .putString(KEY_REMINDER_STARTED_AT, reminderStartedAt)
+            .putString(KEY_CARD_SHOWN_AT, cardShownAt)
+            .remove("alreadySent")
+            .remove("waitingSince")
+            .remove("sentAt")
+            .apply()
+    }
+
     private fun logRemote(action: String, state: DeviceNotificationApi.RemoteState?) {
         if (state == null) {
             Log.w(DeviceNotificationApi.TAG, "WOULD_$action")
@@ -593,7 +672,7 @@ object DeviceNotificationCue {
         }
         Log.i(
             DeviceNotificationApi.TAG,
-            "$action source=${DeviceNotificationApi.SOURCE} alreadySent=${state.alreadySent} waitingSince=${state.waitingSince} sentAt=${state.sentAt}"
+            "$action source=${DeviceNotificationApi.SOURCE} cardStatus=${state.cardStatus.wire} reminderStartedAt=${state.reminderStartedAt} cardShownAt=${state.cardShownAt}"
         )
     }
 }
