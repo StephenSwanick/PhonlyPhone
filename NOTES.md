@@ -56,7 +56,6 @@ Live Home3, hide Samsung Dialer, and fleet CONVERGE are **not** done.
 - Outgoing intents target this app’s `DialerActivity`.
 - Default launcher icon is the Phonly brandmark. Fossify color-icon variants in Customize are still the old handset.
 - Crash fix: keep `color_incoming_call` in `colors.xml`.
-- Missed-call top bar (debug 1.1.0 / 24, AAAAY 2026-08-30): allowlisted miss over Home; count + “and others”; tap/Recents clears. Powered-off call is VM, not this bar.
 
 ## Allowlist
 
@@ -115,36 +114,3 @@ No VVM inbox in this APK. Leave Samsung/T-Mobile Visual Voicemail SHOW if that i
 3. Hide Samsung Dialer on live Home only after default Phone is set by policy or setup. Do not fleet CONVERGE. Do not Save KSP.
 
 Do not mix Esper V1=V2 cutover, PhonlyV1 codebase, or Knox Manage into this folder unless asked.
-
-## Missed-call overlay (research 2026-08-28)
-
-**Product:** one small **Missed call** bar on top of whatever is on screen (Home, another app) until the kid taps it or opens Recents. Allowlisted misses only. `IncomingAllowlistDrop` stays silent. Not a 2-second heads-up. Kids have no Settings and no notification shade.
-
-Messages shipped unread **bubbles** (`co.phonly.messages` 1.1.0). Phone stays a top bar so the two do not fight. Do not put SMS here.
-
-**Look**
-
-Rounded bar near the top, below the status icons. One row tall. Not full-screen. Not a chat-head bubble. Stays until they deal with it (unlike an iPhone banner that drops into Notification Center).
-
-Left to right: round photo if we have one, else the Phone icon; two lines — **Missed call** then the name (larger). Optional single **Call** control; otherwise tap the bar. Enough contrast on the wallpaper.
-
-**Many misses — one bar, never a stack**
-
-- Same person, several misses: update in place (“Mom, 3 missed calls”).
-- Different people: still one bar. Latest caller plus “and 1 other” (or a count).
-- Tap opens Recents. Opening Recents clears the bar. Call-back of the latest is optional, not a second bar.
-- Do not pile cards. Do not one-chip-per-caller (covers Home; fights the unread-text bar).
-
-**This APK today (1.1.0 / 24)**
-
-- `SYSTEM_ALERT_WINDOW` + `MissedCallOverlay` top bar. Allowlisted misses only. `IncomingAllowlistDrop` stays silent. Declined calls do not show a bar.
-- Fossify overlay snackbar / `ACTION_MANAGE_OVERLAY_PERMISSION` sends the kid to Settings. Dead on live Home. **Do not** use that for this feature.
-- Incoming/in-call notifications (`CallNotificationManager`) are live-call UI, not this missed-call card.
-
-**Grant (done 2026-08-30, operator):** fleet KSP Permission Controls Appear on top → `co.phonly.phone` and `co.phonly.messages`. Blueprint cannot grant this. Keep it on the fleet KSP profile. Home overlay proven on AAAAY (debug). Reboot-with-unacked-miss and Home↔School still optional.
-
-**Lab prove (done on Home; V2-DEV, not live Home3)**
-
-Grant ≠ draw over Esper Home. Proven: `TYPE_APPLICATION_OVERLAY` bar over Esper Home on AAAAY. Optional leftover: reboot re-show, Home↔School. If a later Home CONVERGE eats it, stop.
-
-Samsung Floating notifications / Smart pop-up / chat bubbles need Settings. Not a path. Not a substitute.

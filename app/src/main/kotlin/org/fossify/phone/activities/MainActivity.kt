@@ -42,7 +42,6 @@ import org.fossify.phone.fragments.MyViewPagerFragment
 import org.fossify.phone.fragments.RecentsFragment
 import org.fossify.phone.helpers.DeviceNotificationCue
 import org.fossify.phone.helpers.OPEN_DIAL_PAD_AT_LAUNCH
-import org.fossify.phone.helpers.MissedCallOverlay
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.helpers.tabsList
 import org.fossify.phone.models.Events

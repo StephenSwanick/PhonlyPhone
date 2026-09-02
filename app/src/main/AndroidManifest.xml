@@ -204,20 +204,6 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name=".services.MissedCallOverlayService"
-            android:exported="false" />
-
-        <receiver
-            android:name=".receivers.MissedCallOverlayReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
-
         <receiver
             android:name=".receivers.CallActionReceiver"
             android:enabled="true"

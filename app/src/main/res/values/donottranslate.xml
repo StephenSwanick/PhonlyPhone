@@ -2,10 +2,6 @@
     <string name="package_name">co.phonly.phone</string>
     <string name="app_name">Phonly Phone</string>
     <string name="call_not_allowed">Call not allowed</string>
-    <string name="missed_call">Missed call</string>
-    <string name="missed_calls_from">%1$s, %2$d missed calls</string>
-    <string name="missed_call_and_one_other">%1$s and 1 other</string>
-    <string name="missed_call_and_others">%1$s and %2$d others</string>
     <string name="allowlist_json_title">Allowlist JSON</string>
     <string name="allowlist_json_description">JSON array of allowlist entries. Phone uses e164 when voice is true.</string>
     <string name="device_imei_title">Device IMEI</string>

@@ -15,7 +15,6 @@ import org.fossify.phone.helpers.CallManager
 import org.fossify.phone.helpers.CallNotificationManager
 import org.fossify.phone.helpers.DeviceNotificationCue
 import org.fossify.phone.helpers.IncomingAllowlistDrop
-import org.fossify.phone.helpers.MissedCallOverlay
 import org.fossify.phone.helpers.NoCall
 import org.fossify.phone.models.Events
 import org.greenrobot.eventbus.EventBus
