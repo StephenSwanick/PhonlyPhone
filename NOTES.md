@@ -9,31 +9,35 @@ This app stays its own public repo. Not inside PhonlyV1 / Phonly Code.
 Kotlin namespace stays `org.fossify.phone`. Install id is `co.phonly.phone` (debug and release; no `.debug` suffix).  
 Messages / SMS is a later repo (PhonlyMessages, `co.phonly.messages`). Do not put SMS here.
 
-## Status (2026-09-01) — cue/notify-device
+## Status (2026-09-02) — Phone cue done (33)
 
-Missed-call **overlay is dead** (CONVERGE kills `SYSTEM_ALERT_WINDOW`). Live cue is a delayed Esper `NOTIFY_DEVICE`. PhonlyAPI owns the timer. This APK reports facts only.
+Missed-call **overlay is dead**. Live cue is Esper `NOTIFY_DEVICE`. PhonlyAPI **63e43f0** owns the timer. Missed-call and unread-text are **two independent slots**. This APK talks HTTP itself (`source=phone`). Do not funnel through Messages. Do not fleet CONVERGE. Do not Save KSP.
 
-**Branch:** `cue/notify-device` from signed **1.0.0 / 23**. Debug sideload cannot POST on AAAAY (`UnknownHostException` for PhonlyAPI — Knox blocks unmanaged uid). Signed **1.2.0 / 31** is on AAAAY (Esper library SHOW **PhonlyV2 - DEV v36.0**, installer DPC, lastUpdate 22:43). Package `co.phonly.phone`. IMEI is **not** baked into release (AppConfig `device_imei` + telephony). Token from local `notification.properties` at assemble, not git.
+**On device:** signed **1.2.0 / 33** on AAAAY (CONVERGE 11:33, Esper library PhonlyV2 - DEV **v39.0**). Package `co.phonly.phone`. IMEI is not baked in. Token from local `notification.properties` at assemble, not git. Mongo `notification` is **permanent**. **32** remains in library history (DEV **v38.0**). Cue function is locked; next work is Messages **32**, not a Phone 34.
 
-**Lab (AAAAY, 2026-09-01) — missed-call pile proven.** Same Mongo `notification` as Messages. Recents open = looked; Home = left; swipe-kill not required; Close on the Esper card is not looked. Do not fleet CONVERGE. Do not Save KSP.
+**Recents = Call history tab in front.** On AAAAY, launching Phone lands on that tab (no Recents button). Recents open → `POST /looked` `source=phone` only. Home / leave Phone → LEFT: remaining unacked misses → `POST /pile`; after we acked our misses (`owedClear`) → `POST /clear`. A miss **while Call history is already in front** stays unacked until Home, then piles (accepted). Clear must not touch messages (API enforces). Inbox LOOKED/LEFT is ignored. Close on the Esper card is not looked. Card copy is API: title **Phonly**, body **You have a missed call.** Esper’s second Close-confirm is Esper chrome, not our payload. Extra misses while `phone.alreadySent` stay quiet until Call history (API does not restart the wait). `knownSigner` / matching Messages cert is optional; cross-app LOOKED is not required.
 
-- **Messages SMS** (separate repo, `co.phonly.messages` **1.2.0 / 29** then **30**): unread while Messages closed → card ~60s later. Home is left. Extra texts after Close stay quiet.
-- **Phone 30 hole:** skipped `POST /pile` when Android’s default-network “validated” flag was off (often during/after a voice call — **not** a real 2-minute outage), then quit at 2 minutes. 7:39 VM and 10:08 miss died that way. 10:00 POST landed but `alreadySent` from the 8:40 leftover card blocked a new wait (Recents had not LOOKED).
-- **Phone 31:** POSTs anyway. First attempt 8s after the miss; on failure retry every 15s until Recents is opened or the POST succeeds (no 2-minute give-up).
-- **Prove (22:48 ET):** allowlisted caller rang AAAAY and **the calling phone hung up** (unanswered). Recents `MISSED` (`type=3`). 31 `telecom miss disconnect=5`, first pile `UnknownHostException`, retries continued, Esper card **22:52**. Caller hang-up / ring-out **is** a miss; it does **not** have to reach VM.
-- **LOOKED/CLEAR:** Recents open 22:46 unlocked the CONVERGE leftover wait (`sentAt` 22:45); Home → CLEAR. Default Phone must be set again after CONVERGE (`ROLE_DIALER` often reverts to Samsung).
+**33:** after a miss, start a short foreground service through the 8s wait and POST (Android 14 `shortService`, ~3 min max). Stop on LOOKED or a successful pile. Rank WiFi / ethernet / cell via `Network.openConnection`; do not `bindProcessToNetwork`. Not Recents. Not overlay. Not AlarmManager. Not Messages. Operator did not see a shade flash; leave the FGS as-is.
 
-**Not this repo:** Messages **30** still has the validated-network skip + 2-minute give-up. Fix in the Messages agent. Do not edit Messages from here.
+**AAAAY proof (33) — 2026-09-02 afternoon.** Phone pid **12327**. Leave Call history closed unless testing LOOKED.
 
-**Debug cert:** `%USERPROFILE%\.android\debug.keystore` (same as Messages, for `co.phonly.permission.NOTIFICATION`). Signed uninstall first; debug cannot overwrite the Esper cert.
+- 11:33 CONVERGE leftover: `post FGS up` → PILE `via=wifi/ok HTTP 200` `waitingSince=2026-09-02T15:32:16.853Z`. Card `sentAt=2026-09-02T15:34:03.834Z`.
+- 11:49:58 miss (Call history closed): FGS + debounce kept → 11:50:07 PILE `waitingSince=2026-09-02T15:50:07.011Z`. Card `sentAt=2026-09-02T15:52:04.801Z`. Messages slot unchanged.
+- Opening Phone LOOKED then CLEAR: `phone.alreadySent=false`, `waitingSince=null`, `sentAt` kept. Messages untouched.
+- 11:57 miss with Call history still open: `miss while Recents open; wait for LEFT` (no pile until Home).
+- After Home + 12:01 extra miss: 12:00:44 PILE `waitingSince=2026-09-02T16:00:44.928Z`; 12:01 extra POST reused the same wait (debounce kept). Card 12:02. Mongo: `phone.alreadySent=true`, `waitingSince=16:00:44.928Z`, `sentAt=2026-09-02T16:02:03.987Z`. Messages: `alreadySent=false`, `waitingSince=null`, `sentAt=2026-09-02T13:56:13.858Z`.
 
-**This APK:** no overlay draw, no Appear-on-top checks, no AlarmManager for the 15-minute wait, no Esper key, no caller id on the wire. **Callee** decline / hang-up while ringing is **not** a miss (`REJECTED`). **Caller** hang-up / ring-out **is** (Recents `MISSED` or `VOICEMAIL`, even if the carrier sets connect time). Powered-off call that went to carrier VM is **not** a miss (`CallService` never ran).
+**32 (history):** call-log and network ticks must not reset the 8s/15s wait. Do not skip pile on VALIDATED. Lab 10:22: WiFi ranked but still `UnknownHostException` until 33’s FGS. 9:38 (APK 31) never reached Mongo (leftover call path + debounce reset + DNS stampede).
 
-**Facts:** Recents missed or voicemail row (allowlisted, ring-out / caller hang-up / VM) while Recents is not in front → `POST /pile` (debounced 8s; retry every 15s until LOOKED or POST; do not skip on Android’s validated-network flag). Callee hang-up is not a miss. Do not skip pile on local `piledThisCycle` / `alreadySent` / `waitingSince`; extra POSTs are harmless (API ignores if already waiting or `alreadySent`). Recents open → `POST /looked`. Recents leave / Home is “left” (swipe-kill not required): remaining unacked → `POST /pile`; after we acked our miss pile → `POST /clear`. Boot GET must not overwrite a LOOKED that landed while GET was in flight. LOOKED/LEFT broadcasts to Messages are best-effort only (different release certs; Phone owns `co.phonly.permission.NOTIFICATION`). Do not assume they arrive. Close on the Esper card is not looked.
+**Lab (AAAAY, 2026-09-01) — missed-call pile proven on 31** when DNS worked. Caller hang-up / ring-out **is** a miss; it does not have to reach VM. Phone 30 skipped pile on Android’s “validated” flag during/after a voice call, then quit at 2 minutes — 31 POSTs anyway and retries every 15s until Recents or POST.
+
+**This APK:** no overlay draw, no AlarmManager for the wait, no Esper key, no caller id on the wire. **Callee** decline / hang-up while ringing is **not** a miss (`REJECTED`). **Caller** hang-up / ring-out **is** (Recents `MISSED` or `VOICEMAIL`). Powered-off call that went to carrier VM is **not** a miss (`CallService` never ran).
+
+**Facts:** Recents missed or voicemail row (allowlisted) while Call history is not in front → `POST /pile` (debounced 8s, not reset on observer ticks; retry every 15s until LOOKED or POST; do not skip VALIDATED). Recents open → `POST /looked`. Recents leave / Home: remaining unacked → pile; after we acked our miss → clear. Boot GET must not overwrite a LOOKED that landed while GET was in flight. Body `{ imei, source: "phone" }`. Missing `source` → 400.
 
 **Token / IMEI:** lab Bearer from env or `%LOCALAPPDATA%\phonly-phone-signing\notification.properties` (`token=`). Not in git. Release forces `DEVICE_IMEI_OVERRIDE=""`. Runtime IMEI: AppConfig `device_imei`, then cache, then telephony. Empty IMEI → log `WOULD_PILE skip: no IMEI`.
 
-**Do not:** treat overlay 1.1.0 as the live path. Do not put numbers in the JSON body. Do not bake AAAAY IMEI into the signed library APK.
+**Do not:** treat overlay 1.1.0 as the live path. Do not put numbers in the JSON body. Do not bake AAAAY IMEI into the signed library APK. Do not edit Phonly Messages or PhonlyAPI from here.
 
 ## Status (2026-08-20, later)
 
@@ -104,13 +108,11 @@ No VVM inbox in this APK. Leave Samsung/T-Mobile Visual Voicemail SHOW if that i
 
 - `JAVA_HOME` = Android Studio `jbr`, `ANDROID_HOME` = `%LOCALAPPDATA%\Android\Sdk`.
 - Debug: `.\gradlew.bat assembleFossDebug` → `%USERPROFILE%\AppData\Local\phonly-phone-build\app\outputs\apk\foss\debug\`.
-- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-31-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). First Esper cut is **not** minified.
+- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-33-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). First Esper cut is **not** minified.
 - Build output is **outside Dropbox**. Do not sync `app/build`, `build`, `.gradle` in Dropbox.
 
 ## Suggested next
 
-1. Messages agent: drop the validated-network skip and 2-minute give-up (same as Phone 31). Do not edit Messages from this repo.
-2. Optional lab: callee decline on AAAAY should **not** card (`REJECTED`). Caller hang-up already proven 22:48→22:52.
-3. Hide Samsung Dialer on live Home only after default Phone is set by policy or setup. Do not fleet CONVERGE. Do not Save KSP.
+Phone cue is **done** on 33. Handoff to **Phonly Messages** for APK **32** (inbox debounce keep, ignore Phone LOOKED/LEFT, post-call POST the same way Phone 33 does). Do not funnel Messages through this APK. Home3 / fleet untouched. Do not CONVERGE or Save KSP from this chat unless asked.
 
 Do not mix Esper V1=V2 cutover, PhonlyV1 codebase, or Knox Manage into this folder unless asked.

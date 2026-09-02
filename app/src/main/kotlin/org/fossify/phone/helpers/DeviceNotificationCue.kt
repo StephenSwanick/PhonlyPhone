@@ -2,7 +2,6 @@ package org.fossify.phone.helpers
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.database.ContentObserver
 import android.net.ConnectivityManager
 import android.net.Network
@@ -18,6 +17,7 @@ import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.helpers.PERMISSION_READ_CALL_LOG
 import org.fossify.phone.extensions.isConference
 import org.fossify.phone.extensions.isOutgoing
+import org.fossify.phone.services.DeviceNotificationPostService
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.Executors
@@ -25,15 +25,16 @@ import java.util.concurrent.Executors
 /**
  * Local miss pile + fact reports to PhonlyAPI. No overlay, no AlarmManager, no Esper key.
  *
- * Pile = Recents missed row or voicemail row (ring-out / VM). Hang-up is not a miss.
- * Recents open = looked. Recents leave / Home is left. Extra POSTs are harmless.
+ * Recents = Call history tab in front. On AAAAY, launching Phone is that tab.
+ * Recents open → POST /looked source=phone. Home / leave → LEFT: remaining unacked
+ * → POST /pile; after we acked our misses → POST /clear (API will not touch messages).
+ * Inbox LOOKED/LEFT is ignored. Extra POSTs while alreadySent stay quiet at the API.
  */
 object DeviceNotificationCue {
     const val PERMISSION = "co.phonly.permission.NOTIFICATION"
     const val ACTION_LOOKED = "co.phonly.intent.NOTIFICATION_LOOKED"
     const val ACTION_LEFT = "co.phonly.intent.NOTIFICATION_LEFT"
     const val EXTRA_SOURCE = "source"
-    const val MESSAGES_PACKAGE = "co.phonly.messages"
 
     private const val KEY_UNACKED = "unacked_count"
     private const val KEY_PILED = "piled_this_cycle"
@@ -59,6 +60,9 @@ object DeviceNotificationCue {
 
     @Volatile
     private var pilePosted = false
+
+    @Volatile
+    private var pileDebouncePending = false
 
     @Volatile
     private var lookGeneration = 0
@@ -175,31 +179,22 @@ object DeviceNotificationCue {
             return
         }
         if (visible) {
-            onLooked(app, broadcast = true, postLooked = true, ackMisses = true)
+            onLooked(app, postLooked = true, ackMisses = true)
         } else {
-            onLeft(app, broadcast = true)
+            onLeft(app)
         }
     }
 
-    fun onPeerLooked(context: Context) {
-        lookGeneration += 1
-        cancelPileDebounce()
-        synchronized(lock) {
-            writePiled(context, false)
-        }
-        Log.i(DeviceNotificationApi.TAG, "peer LOOKED")
+    fun onPeerLooked() {
+        Log.i(DeviceNotificationApi.TAG, "ignore peer LOOKED (inbox is not Recents)")
     }
 
-    fun onPeerLeft(context: Context) {
-        Log.i(DeviceNotificationApi.TAG, "peer LEFT")
-        if (hasUnacked(context) && !recentsForeground) {
-            schedulePile(context)
-        }
+    fun onPeerLeft() {
+        Log.i(DeviceNotificationApi.TAG, "ignore peer LEFT (inbox is not Recents)")
     }
 
     private fun onLooked(
         context: Context,
-        broadcast: Boolean,
         postLooked: Boolean,
         ackMisses: Boolean,
     ) {
@@ -215,9 +210,6 @@ object DeviceNotificationCue {
             }
             writePiled(context, false)
         }
-        if (broadcast) {
-            sendToMessages(context, ACTION_LOOKED)
-        }
         if (postLooked) {
             io.execute {
                 try {
@@ -230,10 +222,7 @@ object DeviceNotificationCue {
         }
     }
 
-    private fun onLeft(context: Context, broadcast: Boolean) {
-        if (broadcast) {
-            sendToMessages(context, ACTION_LEFT)
-        }
+    private fun onLeft(context: Context) {
         if (hasUnacked(context)) {
             owedClear = false
             schedulePile(context)
@@ -420,23 +409,30 @@ object DeviceNotificationCue {
                 Log.i(DeviceNotificationApi.TAG, "pile skipped (POST in flight)")
                 return
             }
-            // Do not skip on local piledThisCycle / alreadySent / waitingSince.
-            // Those go stale after LOOKED. Extra POSTs are harmless: the API
-            // does not restart an active wait. Recents leave / Home is enough;
-            // Recents swipe-kill is not required. Do not assume Messages LOOKED
-            // reached this process (different release certs).
             pileApp = app
-            mainHandler.removeCallbacks(pileRunnable)
+            // Call-log / network ticks must not restart the 8s timer. Extra
+            // POSTs while alreadySent are harmless; the API does not restart
+            // the phone wait. Do not skip on VALIDATED.
+            if (pileDebouncePending) {
+                Log.i(DeviceNotificationApi.TAG, "pile debounce kept")
+                return
+            }
+            pileDebouncePending = true
             mainHandler.postDelayed(pileRunnable, PILE_DEBOUNCE_MS)
         }
+        startPostForeground(app)
         Log.i(DeviceNotificationApi.TAG, "pile debounce ${PILE_DEBOUNCE_MS}ms")
     }
 
     private fun cancelPileDebounce() {
         synchronized(lock) {
             pilePosted = false
+            pileDebouncePending = false
             mainHandler.removeCallbacks(pileRunnable)
-            pileApp?.let { unwatchNetwork(it) }
+            pileApp?.let { app ->
+                unwatchNetwork(app)
+                stopPostForeground(app)
+            }
         }
     }
 
@@ -445,9 +441,14 @@ object DeviceNotificationCue {
         if (recentsForeground || !hasUnacked(app)) {
             return
         }
-        Log.i(DeviceNotificationApi.TAG, "network up; pile now")
-        mainHandler.removeCallbacks(pileRunnable)
-        mainHandler.post(pileRunnable)
+        synchronized(lock) {
+            if (pilePosted || pileDebouncePending) {
+                Log.i(DeviceNotificationApi.TAG, "network up; pile wait kept")
+                return
+            }
+        }
+        Log.i(DeviceNotificationApi.TAG, "network up; pile debounce")
+        schedulePile(app)
     }
 
     private fun watchNetwork(context: Context) {
@@ -483,17 +484,27 @@ object DeviceNotificationCue {
         synchronized(lock) {
             if (recentsForeground || !hasUnacked(context)) {
                 unwatchNetwork(app)
+                stopPostForeground(app)
                 return
             }
             pileApp = app
             watchNetwork(app)
+            pileDebouncePending = true
             mainHandler.removeCallbacks(pileRunnable)
             mainHandler.postDelayed(pileRunnable, PILE_RETRY_MS)
         }
+        startPostForeground(app)
         Log.i(DeviceNotificationApi.TAG, "pile retry ${PILE_RETRY_MS}ms (until looked or POST)")
     }
 
     private fun postPile(context: Context) {
+        synchronized(lock) {
+            if (pilePosted) {
+                return
+            }
+            pilePosted = true
+            pileDebouncePending = false
+        }
         io.execute {
             try {
                 if (!hasUnacked(context)) {
@@ -502,12 +513,13 @@ object DeviceNotificationCue {
                 }
                 if (recentsForeground) {
                     Log.i(DeviceNotificationApi.TAG, "pile aborted; Recents is looking")
+                    synchronized(lock) {
+                        pilePosted = false
+                    }
+                    stopPostForeground(context)
                     return@execute
                 }
                 val gen = lookGeneration
-                synchronized(lock) {
-                    pilePosted = true
-                }
                 val attempt = DeviceNotificationApi.pile(context)
                 if (gen != lookGeneration) {
                     Log.i(DeviceNotificationApi.TAG, "PILE stale; looked won")
@@ -529,6 +541,7 @@ object DeviceNotificationCue {
                     writePiled(context, attempt.state != null)
                     if (attempt.state != null) {
                         unwatchNetwork(context)
+                        stopPostForeground(context)
                     }
                 }
                 if (attempt.state == null && attempt.retryable) {
@@ -545,17 +558,14 @@ object DeviceNotificationCue {
         }
     }
 
-    private fun sendToMessages(context: Context, action: String) {
-        try {
-            val intent = Intent(action).apply {
-                setPackage(MESSAGES_PACKAGE)
-                putExtra(EXTRA_SOURCE, DeviceNotificationApi.SOURCE)
-            }
-            context.sendBroadcast(intent, PERMISSION)
-            Log.i(DeviceNotificationApi.TAG, "broadcast $action → Messages")
-        } catch (t: Throwable) {
-            Log.w(DeviceNotificationApi.TAG, "broadcast $action ${t.message}")
-        }
+    private fun startPostForeground(context: Context) {
+        val app = context.applicationContext
+        mainHandler.post { DeviceNotificationPostService.start(app) }
+    }
+
+    private fun stopPostForeground(context: Context) {
+        val app = context.applicationContext
+        mainHandler.post { DeviceNotificationPostService.stop(app) }
     }
 
     private fun hasUnacked(context: Context) = unackedCount(context) > 0
@@ -583,7 +593,7 @@ object DeviceNotificationCue {
         }
         Log.i(
             DeviceNotificationApi.TAG,
-            "$action alreadySent=${state.alreadySent} waitingSince=${state.waitingSince} sentAt=${state.sentAt}"
+            "$action source=${DeviceNotificationApi.SOURCE} alreadySent=${state.alreadySent} waitingSince=${state.waitingSince} sentAt=${state.sentAt}"
         )
     }
 }

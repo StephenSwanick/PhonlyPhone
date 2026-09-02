@@ -158,8 +158,9 @@ android {
 
     buildTypes {
         debug {
-            // Same debug.keystore as Messages so signature permission works.
             // Keep applicationId = co.phonly.phone (no .debug suffix).
+            // Matching Messages' debug cert / knownSigner is optional: Recents
+            // LOOKED does not go through Messages.
             if (debugKeystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("phonlyDebug")
             }

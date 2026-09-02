@@ -3,6 +3,9 @@ package org.fossify.phone.helpers
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.RestrictionsManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.telephony.TelephonyManager
 import android.util.Log
 import org.fossify.phone.BuildConfig
@@ -60,59 +63,144 @@ internal object DeviceNotificationApi {
         path: String,
         would: String,
     ): Attempt {
+        val imei = deviceImei(context)
+        val token = BuildConfig.NOTIFICATION_TOKEN.trim()
+        if (imei.isEmpty()) {
+            Log.w(TAG, "$would skip: no IMEI")
+            return Attempt(state = null, retryable = false)
+        }
+        if (token.isEmpty()) {
+            Log.w(TAG, "$would skip: no token (operator sets DEVICE_NOTIFICATION_LAB_TOKEN after Render env)")
+            return Attempt(state = null, retryable = false)
+        }
+        val base = BuildConfig.NOTIFICATION_API_URL.trim().trimEnd('/')
+        val encodedImei = URLEncoder.encode(imei, "UTF-8")
+        val url = URL("$base$path?imei=$encodedImei&source=$SOURCE")
+        val body = if (method == "POST") {
+            JSONObject()
+                .put("imei", imei)
+                .put("source", SOURCE)
+                .toString()
+        } else {
+            null
+        }
+
+        // After a voice call Android may leave this process on the call path,
+        // which cannot look up hosts. POST on WiFi / mobile data instead.
+        // Do not bindProcessToNetwork (would affect InCall). Do not go through Messages.
+        var lastRetryable: Attempt? = null
+        for (route in dataRoutes(context)) {
+            val attempt = execute(url, method, token, body, would, route)
+            if (attempt.state != null || !attempt.retryable) {
+                return attempt
+            }
+            lastRetryable = attempt
+        }
+        return lastRetryable ?: Attempt(state = null, retryable = true)
+    }
+
+    private data class Route(val label: String, val network: Network?)
+
+    private fun dataRoutes(context: Context): List<Route> {
+        val fallback = Route("default", null)
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+            ?: return listOf(fallback)
+        val ranked = try {
+            cm.allNetworks.mapNotNull { network ->
+                val caps = cm.getNetworkCapabilities(network) ?: return@mapNotNull null
+                if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                    return@mapNotNull null
+                }
+                Route(routeLabel(caps), network) to routeScore(caps)
+            }.sortedByDescending { it.second }.map { it.first }.distinctBy { it.network }
+        } catch (t: Throwable) {
+            Log.w(TAG, "routes ${t.message}")
+            emptyList()
+        }
+        return ranked + fallback
+    }
+
+    private fun routeScore(caps: NetworkCapabilities): Int {
+        var score = 100
+        // VALIDATED is a bonus, not a gate (Phone 30 skipped pile during/after a call).
+        if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+            score += 5
+        }
+        if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)) {
+            score += 10
+        }
+        when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> score += 40
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> score += 30
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> score += 10
+        }
+        return score
+    }
+
+    private fun routeLabel(caps: NetworkCapabilities): String {
+        val transport = when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "eth"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cell"
+            else -> "net"
+        }
+        val validated = if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+            "ok"
+        } else {
+            "novalid"
+        }
+        return "$transport/$validated"
+    }
+
+    private fun execute(
+        url: URL,
+        method: String,
+        token: String,
+        body: String?,
+        would: String,
+        route: Route,
+    ): Attempt {
+        var connection: HttpURLConnection? = null
         return try {
-            val imei = deviceImei(context)
-            val token = BuildConfig.NOTIFICATION_TOKEN.trim()
-            if (imei.isEmpty()) {
-                Log.w(TAG, "$would skip: no IMEI")
-                return Attempt(state = null, retryable = false)
+            val raw = if (route.network != null) {
+                route.network.openConnection(url)
+            } else {
+                url.openConnection()
             }
-            if (token.isEmpty()) {
-                Log.w(TAG, "$would skip: no token (operator sets DEVICE_NOTIFICATION_LAB_TOKEN after Render env)")
-                return Attempt(state = null, retryable = false)
-            }
-            val base = BuildConfig.NOTIFICATION_API_URL.trim().trimEnd('/')
-            val encodedImei = URLEncoder.encode(imei, "UTF-8")
-            val url = URL("$base$path?imei=$encodedImei&source=$SOURCE")
-            val connection = (url.openConnection() as HttpURLConnection).apply {
+            connection = (raw as HttpURLConnection).apply {
                 requestMethod = method
                 connectTimeout = 10_000
                 readTimeout = 15_000
                 setRequestProperty("Authorization", "Bearer $token")
                 setRequestProperty("Accept", "application/json")
                 useCaches = false
-                if (method == "POST") {
+                if (body != null) {
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    val body = JSONObject()
-                        .put("imei", imei)
-                        .put("source", SOURCE)
-                        .toString()
                     OutputStreamWriter(outputStream, StandardCharsets.UTF_8).use { it.write(body) }
                 }
             }
 
             val code = connection.responseCode
-            val raw = try {
-                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-                stream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
-            } finally {
-                connection.disconnect()
-            }
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            val rawBody = stream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
 
             if (code == 429 || code == 503 || code >= 500) {
-                Log.w(TAG, "$would HTTP $code $raw")
+                Log.w(TAG, "$would via=${route.label} HTTP $code $rawBody")
                 return Attempt(state = null, retryable = true)
             }
             if (code !in 200..299) {
-                Log.w(TAG, "$would HTTP $code $raw")
+                Log.w(TAG, "$would via=${route.label} HTTP $code $rawBody")
                 return Attempt(state = null, retryable = false)
             }
 
-            Attempt(state = parseState(raw), retryable = false)
+            Log.i(TAG, "via=${route.label} HTTP $code")
+            Attempt(state = parseState(rawBody), retryable = false)
         } catch (t: Throwable) {
-            Log.w(TAG, "$would ${t.javaClass.simpleName}: ${t.message}")
+            Log.w(TAG, "$would via=${route.label} ${t.javaClass.simpleName}: ${t.message}")
             Attempt(state = null, retryable = isRetryable(t))
+        } finally {
+            connection?.disconnect()
         }
     }
 
@@ -143,15 +231,25 @@ internal object DeviceNotificationApi {
             }
             val notification = root.optJSONObject("notification")
                 ?: return RemoteState(alreadySent = false, waitingSince = null, sentAt = null)
+            // GET ?source=phone returns the phone slot as `notification`. Nested
+            // `notification.phone` is the permanent two-slot document.
+            val slot = notification.optJSONObject(SOURCE) ?: notification
             RemoteState(
-                alreadySent = notification.optBoolean("alreadySent", false),
-                waitingSince = notification.optString("waitingSince").takeIf { it.isNotBlank() && it != "null" },
-                sentAt = notification.optString("sentAt").takeIf { it.isNotBlank() && it != "null" },
+                alreadySent = slot.optBoolean("alreadySent", false),
+                waitingSince = jsonStringOrNull(slot, "waitingSince"),
+                sentAt = jsonStringOrNull(slot, "sentAt"),
             )
         } catch (t: Throwable) {
             Log.w(TAG, "parse ${t.message}")
             null
         }
+    }
+
+    private fun jsonStringOrNull(obj: JSONObject, key: String): String? {
+        if (!obj.has(key) || obj.isNull(key)) {
+            return null
+        }
+        return obj.optString(key).trim().takeIf { it.isNotEmpty() && it != "null" }
     }
 
     @SuppressLint("HardwareIds", "MissingPermission")

@@ -14,12 +14,8 @@ class DeviceNotificationCueReceiver : BroadcastReceiver() {
             return
         }
         when (action) {
-            DeviceNotificationCue.ACTION_LOOKED -> {
-                DeviceNotificationCue.onPeerLooked(context.applicationContext)
-            }
-            DeviceNotificationCue.ACTION_LEFT -> {
-                DeviceNotificationCue.onPeerLeft(context.applicationContext)
-            }
+            DeviceNotificationCue.ACTION_LOOKED -> DeviceNotificationCue.onPeerLooked()
+            DeviceNotificationCue.ACTION_LEFT -> DeviceNotificationCue.onPeerLeft()
         }
     }
 }
