@@ -9,19 +9,19 @@ This app stays its own public repo. Not inside PhonlyV1 / Phonly Code.
 Kotlin namespace stays `org.fossify.phone`. Install id is `co.phonly.phone` (debug and release; no `.debug` suffix).  
 Messages / SMS is a later repo (PhonlyMessages, `co.phonly.messages`). Do not put SMS here.
 
-## Status (2026-09-02) — Phone 34 parses cardStatus
+## Status (2026-09-02) — Phone 34 on AAAAY (cardStatus)
 
-Missed-call **overlay is dead**. Live cue is Esper `NOTIFY_DEVICE`. PhonlyAPI owns the timer. Missed-call and unread-text are **two independent slots**. This APK talks HTTP itself (`source=phone`). Do not funnel through Messages. Do not fleet CONVERGE. Do not Save KSP. **CONVERGE AAAAY only when the operator asks.**
+Missed-call **overlay is dead**. Live cue is Esper `NOTIFY_DEVICE`. PhonlyAPI owns the timer. Missed-call and unread-text are **two independent slots**. This APK talks HTTP itself (`source=phone`). Do not funnel through Messages. Do not fleet CONVERGE. Do not Save KSP.
 
 PhonlyAPI notification JSON is **`cardStatus` idle|waiting|shown**, `reminderStartedAt`, `cardShownAt` only. Do not parse or write `alreadySent` / `waitingSince` / `sentAt`. HTTP is still GET `/api/device/notification?imei=&source=phone` and POST `/pile|looked|clear` body `{ imei, source: "phone" }`. Missing source → 400. Recents / Call history looked-or-clear may only send `source=phone`. Never `source=messages`. Recents is not read texts. Inbox LOOKED/LEFT from Messages is ignored. Slot is never deleted. Looked/clear → idle (`reminderStartedAt` null, `cardShownAt` kept). Quiet = not waiting. `shown` = card already sent; extra pile does not restart.
 
-**This APK:** foss **`1.2.0` / `VERSION_CODE` 34**. Package `co.phonly.phone`. IMEI is not baked in. Token from local `notification.properties` at assemble, not git. **In Esper library, not on AAAAY yet** — uploaded to PhonlyV2 - DEV **v43.0**. Signed **33** is still on the device (CONVERGE 11:33, library history **v39.0**). **32** remains in library history (DEV **v38.0**). Do not copy Messages 34 hold-while-inbox-open.
+**On device:** signed **1.2.0 / 34** on AAAAY (operator CONVERGE after library **v43.0**). Package `co.phonly.phone`. IMEI is not baked in. Token from local `notification.properties` at assemble, not git. **33** remains in library history (DEV **v39.0**). **32** remains in library history (DEV **v38.0**). Do not copy Messages 34 hold-while-inbox-open.
 
 **Recents = Call history tab in front.** On AAAAY, launching Phone lands on that tab (no Recents button). Recents open → `POST /looked` `source=phone` only. Home / leave Phone → LEFT: remaining unacked misses → `POST /pile`; after we acked our misses (`owedClear`) → `POST /clear`. A miss **while Call history is already in front** stays unacked until Home, then piles (accepted). Clear must not touch messages (API enforces). Inbox LOOKED/LEFT is ignored. Close on the Esper card is not looked. Card copy is API: title **Phonly**, body **You have a missed call.** Esper’s second Close-confirm is Esper chrome, not our payload. Extra misses while `phone.cardStatus` is `shown` stay quiet until Call history (API does not restart the wait). Boot GET: `shown` stays quiet; `waiting` means the reminder is already open; `idle` may pile if there are unacked misses and Recents is not in front. `knownSigner` / matching Messages cert is optional; cross-app LOOKED is not required.
 
-**34:** parse/cache the three fields only (`DeviceNotificationApi` / `DeviceNotificationCue`). Same Recents product as 33. Same FGS / ranked POST as 33.
+**34 (this cut, proven):** parse/cache the three fields only (`DeviceNotificationApi` / `DeviceNotificationCue`). Same Recents product as 33. Same FGS / ranked POST as 33. Git `316cdc92` / `ece87755`. Library upload `phone-34-foss-release.apk` → PhonlyV2 - DEV **v43.0**. Operator CONVERGE + test on AAAAY succeeded 2026-09-02 (~15:28).
 
-**33 (on AAAAY until CONVERGE 34):** after a miss, start a short foreground service through the 8s wait and POST (Android 14 `shortService`, ~3 min max). Stop on LOOKED or a successful pile. Rank WiFi / ethernet / cell via `Network.openConnection`; do not `bindProcessToNetwork`. Not Recents. Not overlay. Not AlarmManager. Not Messages. Operator did not see a shade flash; leave the FGS as-is. Parsed the old JSON names.
+**33 (history):** after a miss, start a short foreground service through the 8s wait and POST (Android 14 `shortService`, ~3 min max). Stop on LOOKED or a successful pile. Rank WiFi / ethernet / cell via `Network.openConnection`; do not `bindProcessToNetwork`. Not Recents. Not overlay. Not AlarmManager. Not Messages. Operator did not see a shade flash; leave the FGS as-is. Parsed the old JSON names.
 
 **AAAAY proof (33) — 2026-09-02 afternoon.** Phone pid **12327**. Leave Call history closed unless testing LOOKED.
 
@@ -117,6 +117,6 @@ No VVM inbox in this APK. Leave Samsung/T-Mobile Visual Voicemail SHOW if that i
 
 ## Suggested next
 
-Phone **34** parses `cardStatus` / `reminderStartedAt` / `cardShownAt` only. Recents product is unchanged from 33. Do not funnel Messages through this APK. Home3 / fleet untouched. Do not CONVERGE fleet. CONVERGE AAAAY only when the operator asks. Do not Save KSP from this chat unless asked.
+Phone **34** is on AAAAY and proven (cardStatus JSON). Recents product is unchanged from 33. Do not funnel Messages through this APK. Home3 / fleet untouched. Do not CONVERGE fleet. Do not Save KSP from this chat unless asked. This cut is closed.
 
 Do not mix Esper V1=V2 cutover, PhonlyV1 codebase, or Knox Manage into this folder unless asked.
