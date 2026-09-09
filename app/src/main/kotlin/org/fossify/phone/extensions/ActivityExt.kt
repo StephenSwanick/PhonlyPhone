@@ -11,20 +11,24 @@ import org.fossify.commons.helpers.CONTACT_ID
 import org.fossify.commons.helpers.FIRST_CONTACT_ID
 import org.fossify.commons.helpers.IS_PRIVATE
 import org.fossify.commons.helpers.ON_CLICK_CALL_CONTACT
-import org.fossify.commons.helpers.ON_CLICK_VIEW_CONTACT
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.phone.activities.SimpleActivity
+import org.fossify.phone.helpers.canEditDeviceContacts
 
 fun SimpleActivity.handleGenericContactClick(contact: Contact) {
-    when (config.onContactClick) {
-        ON_CLICK_CALL_CONTACT -> startCallWithConfirmationCheck(contact)
-        ON_CLICK_VIEW_CONTACT -> startContactDetailsIntent(contact)
+    if (!canEditDeviceContacts() || config.onContactClick == ON_CLICK_CALL_CONTACT) {
+        startCallWithConfirmationCheck(contact)
+        return
     }
+    startContactDetailsIntent(contact)
 }
 
 fun SimpleActivity.launchCreateNewContactIntent() {
+    if (!canEditDeviceContacts()) {
+        return
+    }
     Intent().apply {
         action = Intent.ACTION_INSERT
         data = ContactsContract.Contacts.CONTENT_URI
@@ -34,6 +38,9 @@ fun SimpleActivity.launchCreateNewContactIntent() {
 
 // handle private contacts differently, only Simple Contacts Pro can open them
 fun Activity.startContactDetailsIntent(contact: Contact) {
+    if (!canEditDeviceContacts()) {
+        return
+    }
     val simpleContacts = "org.fossify.contacts"
     val simpleContactsDebug = "org.fossify.contacts.debug"
     val isPrivateContact = contact.rawId > FIRST_CONTACT_ID

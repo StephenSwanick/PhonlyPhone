@@ -9,6 +9,16 @@ This app stays its own public repo. Not inside PhonlyV1 / Phonly Code.
 Kotlin namespace stays `org.fossify.phone`. Install id is `co.phonly.phone` (debug and release; no `.debug` suffix).  
 Messages / SMS is a later repo (PhonlyMessages, `co.phonly.messages`). Do not put SMS here.
 
+## Status (2026-09-09) — Phone 36 on AAAAY (V2-DEV)
+
+**1.4.0 / 36** is in the Esper library and pinned SHOW on **PhonlyV2 - DEV v44.0**. Operator CONVERGEd AAAAY: Phone, Messages, and `co.phonly.contacts` are all on that unit. Live Home/School/TS stay on **34**. Do not copy 36 onto those blueprints until asked (APK replace drops default Phone).
+
+This cut: Esper boolean **`allowlist_enabled`** next to **`allowlist_json`** (only explicit `false` allows all calls; missing or `true` = today’s empty-list = emergency only). Kid cannot create/edit/delete Android contacts (`canEditDeviceContacts()`). Names still come from Contacts Provider. This APK does **not** write that DB and does **not** read `label` from `allowlist_json`. Tap calls.
+
+**Lab leftover (not this APK):** **Send to phone** still pushes Phone + Messages only. 2026-09-09 ~11:43Z AAAAY AppConfig for those two packages matched Mongo (Stephen / Andrea / Erik / Christina / Catherine, `allowlist_enabled: true`). `co.phonly.contacts` got no AppConfig, so names in Phone did not change. Third Esper target is PhonlyV1. Testing continues elsewhere.
+
+**1.3.0 / 35** was the local `allowlist_enabled` cut; **36** superseded it before library upload. Do not pin 35.
+
 ## Status (2026-09-02) — Phone 34 on AAAAY (cardStatus)
 
 Missed-call **overlay is dead**. Live cue is Esper `NOTIFY_DEVICE`. PhonlyAPI owns the timer. Missed-call and unread-text are **two independent slots**. This APK talks HTTP itself (`source=phone`). Do not funnel through Messages. Do not fleet CONVERGE. Do not Save KSP.
@@ -67,9 +77,10 @@ Live Home3, hide Samsung Dialer, and fleet CONVERGE are **not** done.
 
 ## Allowlist
 
-- Source of truth: Mongo `phonly.devices.allowlist` (Phonly Code). No Mongo in this APK.
-- Delivery: Esper managed config string key **`allowlist_json`** on package **`co.phonly.phone`**.
-- Shape: JSON **string** whose contents are an array:
+- Source of truth: Mongo `phonly.devices.allowList` (Phonly Code). No Mongo in this APK.
+- Delivery: Esper managed config on package **`co.phonly.phone`**: string **`allowlist_json`**, boolean **`allowlist_enabled`**.
+- **`allowlist_enabled`:** only an explicit `false` (boolean, or strings `false` / `0`) means allow all. Missing key or `true` keeps today’s empty-list = emergency only. Do not treat a missing key as open — live kids stay locked until PhonlyAPI pushes `false`.
+- Shape of `allowlist_json`: JSON **string** whose contents are an array:
 
 ```json
 [{"e164":"+17046180435","label":"Test","voice":true,"sms":true}]
@@ -79,15 +90,22 @@ Esper’s device AppConfig box must be:
 
 ```json
 {
-  "allowlist_json": "[{\"e164\":\"+17046180435\",\"label\":\"Test\",\"voice\":true,\"sms\":true}]"
+  "allowlist_json": "[{\"e164\":\"+17046180435\",\"label\":\"Test\",\"voice\":true,\"sms\":true}]",
+  "allowlist_enabled": true
 }
 ```
 
 Phone uses `voice: true` (default true). Messages will later use `sms`.  
-Missing, blank, `[]`, or invalid JSON → emergency only.  
-Plug-in: `CallAllowlist.allowedNumbers()`.
+When the list is **on**: missing, blank, `[]`, or invalid JSON → emergency only.  
+When the list is **off** (`allowlist_enabled: false`): any number may be called; 911 is always allowed.  
+Plug-in: `CallAllowlist`.
 
 Do **not** put kid numbers in KSP / Backbone.
+
+## Kid view-only contacts
+
+- Names in Contacts / Recents / caller ID come from Android Contacts Provider. `co.phonly.contacts` writes that DB. This APK does **not** write Contacts Provider and does **not** read `label` from `allowlist_json`.
+- Kid UI: view names, tap to call or text. Create / add-to-contact / delete / system contact editor are hidden (`canEditDeviceContacts()`).
 
 ## Default Phone app
 
@@ -112,11 +130,11 @@ No VVM inbox in this APK. Leave Samsung/T-Mobile Visual Voicemail SHOW if that i
 
 - `JAVA_HOME` = Android Studio `jbr`, `ANDROID_HOME` = `%LOCALAPPDATA%\Android\Sdk`.
 - Debug: `.\gradlew.bat assembleFossDebug` → `%USERPROFILE%\AppData\Local\phonly-phone-build\app\outputs\apk\foss\debug\`.
-- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-34-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). First Esper cut is **not** minified.
+- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-36-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). First Esper cut is **not** minified.
 - Build output is **outside Dropbox**. Do not sync `app/build`, `build`, `.gradle` in Dropbox.
 
 ## Suggested next
 
-Phone **34** is on AAAAY and proven (cardStatus JSON). Recents product is unchanged from 33. Do not funnel Messages through this APK. Home3 / fleet untouched. Do not CONVERGE fleet. Do not Save KSP from this chat unless asked. This cut is closed.
+This Phone cut is closed. Testing is elsewhere. **Send to phone** must gain a third Esper target (`co.phonly.contacts`) in PhonlyV1 before names appear. Do not pin 36 over **34** on live Home/School/TS. Do not fleet CONVERGE. Do not Save KSP unless asked.
 
 Do not mix Esper V1=V2 cutover, PhonlyV1 codebase, or Knox Manage into this folder unless asked.

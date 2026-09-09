@@ -30,7 +30,6 @@ import org.fossify.phone.databinding.FragmentLettersLayoutBinding
 import org.fossify.phone.extensions.config
 import org.fossify.phone.extensions.handleGenericContactClick
 import org.fossify.phone.extensions.setupWithContacts
-import org.fossify.phone.extensions.startContactDetailsIntent
 import org.fossify.phone.interfaces.RefreshItemsListener
 
 class FavoritesFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerFragment<MyViewPagerFragment.LettersInnerBinding>(context, attributeSet),
@@ -130,7 +129,7 @@ class FavoritesFragment(context: Context, attributeSet: AttributeSet) : MyViewPa
                     activity?.handleGenericContactClick(it as Contact)
                 },
                 profileIconClick = {
-                    activity?.startContactDetailsIntent(it as Contact)
+                    activity?.handleGenericContactClick(it as Contact)
                 }).apply {
                 binding.fragmentList.adapter = this
 

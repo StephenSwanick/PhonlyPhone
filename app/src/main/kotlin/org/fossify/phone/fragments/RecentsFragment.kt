@@ -23,9 +23,7 @@ import org.fossify.phone.adapters.RecentCallsAdapter
 import org.fossify.phone.databinding.FragmentRecentsBinding
 import org.fossify.phone.extensions.config
 import org.fossify.phone.extensions.runAfterAnimations
-import org.fossify.phone.extensions.startAddContactIntent
 import org.fossify.phone.extensions.startCallWithConfirmationCheck
-import org.fossify.phone.extensions.startContactDetailsIntent
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.interfaces.RefreshItemsListener
 import org.fossify.phone.models.CallLogItem
@@ -169,12 +167,7 @@ class RecentsFragment(
                     },
                     profileIconClick = {
                         val recentCall = it as RecentCall
-                        val contact = findContactByCall(recentCall)
-                        if (contact != null) {
-                            activity?.startContactDetailsIntent(contact)
-                        } else {
-                            activity?.startAddContactIntent(recentCall.phoneNumber)
-                        }
+                        activity?.startCallWithConfirmationCheck(recentCall.phoneNumber, recentCall.name)
                     }
                 )
 

@@ -3,6 +3,7 @@ package org.fossify.phone.helpers
 import android.content.Context
 import android.content.RestrictionsManager
 import android.os.Build
+import android.os.Bundle
 import android.telephony.PhoneNumberUtils
 import android.telephony.TelephonyManager
 import android.widget.Toast
@@ -16,11 +17,15 @@ import org.json.JSONArray
  * Missing, blank, or invalid JSON → empty list (emergency only).
  * A present `[]` is also emergency only.
  *
+ * [ALLOWLIST_ENABLED_KEY]: only an explicit `false` disables the list (allow all).
+ * Missing key or `true` keeps today’s empty-list = emergency only.
+ *
  * Incoming: blocked numbers are answered and hung up in [IncomingAllowlistDrop]
  * so the carrier usually skips voicemail. Do not reject them in screening.
  */
 object CallAllowlist {
     const val ALLOWLIST_JSON_KEY = "allowlist_json"
+    const val ALLOWLIST_ENABLED_KEY = "allowlist_enabled"
 
     fun isNumberAllowed(context: Context, rawNumber: String?): Boolean {
         if (rawNumber.isNullOrBlank()) {
@@ -36,7 +41,12 @@ object CallAllowlist {
             return true
         }
 
-        return allowedNumbers(context).any { matches(number, it) }
+        val restrictions = applicationRestrictions(context)
+        if (!isAllowlistEnabled(restrictions)) {
+            return true
+        }
+
+        return readManagedE164s(restrictions).any { matches(number, it) }
     }
 
     /** @return true if the call must not proceed. */
@@ -48,17 +58,33 @@ object CallAllowlist {
         return true
     }
 
-    private fun allowedNumbers(context: Context): List<String> {
-        return readManagedE164s(context)
+    /**
+     * Only an explicit `false` (boolean or the strings `false` / `0`) means allow all.
+     * Missing key, `true`, or anything else keeps enforcement on.
+     */
+    internal fun isAllowlistEnabled(restrictions: Bundle?): Boolean {
+        if (restrictions == null || !restrictions.containsKey(ALLOWLIST_ENABLED_KEY)) {
+            return true
+        }
+        return when (val value = restrictions.get(ALLOWLIST_ENABLED_KEY)) {
+            is Boolean -> value
+            is String -> {
+                val normalized = value.trim().lowercase()
+                normalized != "false" && normalized != "0"
+            }
+            else -> true
+        }
+    }
+
+    private fun applicationRestrictions(context: Context): Bundle? {
+        return context.getSystemService(RestrictionsManager::class.java)?.applicationRestrictions
     }
 
     /**
      * Voice numbers from AppConfig. Empty if unset, blank, `[]`, or invalid JSON.
      */
-    private fun readManagedE164s(context: Context): List<String> {
-        val restrictions = context.getSystemService(RestrictionsManager::class.java)
-            ?.applicationRestrictions ?: return emptyList()
-        if (!restrictions.containsKey(ALLOWLIST_JSON_KEY)) {
+    private fun readManagedE164s(restrictions: Bundle?): List<String> {
+        if (restrictions == null || !restrictions.containsKey(ALLOWLIST_JSON_KEY)) {
             return emptyList()
         }
         val raw = restrictions.getString(ALLOWLIST_JSON_KEY)?.trim().orEmpty()

@@ -29,7 +29,7 @@ import org.fossify.phone.databinding.FragmentLettersLayoutBinding
 import org.fossify.phone.extensions.handleGenericContactClick
 import org.fossify.phone.extensions.launchCreateNewContactIntent
 import org.fossify.phone.extensions.setupWithContacts
-import org.fossify.phone.extensions.startContactDetailsIntent
+import org.fossify.phone.helpers.canEditDeviceContacts
 import org.fossify.phone.interfaces.RefreshItemsListener
 
 class ContactsFragment(context: Context, attributeSet: AttributeSet) : MyViewPagerFragment<MyViewPagerFragment.LettersInnerBinding>(context, attributeSet),
@@ -44,7 +44,8 @@ class ContactsFragment(context: Context, attributeSet: AttributeSet) : MyViewPag
     }
 
     override fun setupFragment() {
-        val placeholderResId = if (context.hasPermission(PERMISSION_READ_CONTACTS)) {
+        val canRead = context.hasPermission(PERMISSION_READ_CONTACTS)
+        val placeholderResId = if (canRead) {
             R.string.no_contacts_found
         } else {
             R.string.could_not_access_contacts
@@ -52,21 +53,20 @@ class ContactsFragment(context: Context, attributeSet: AttributeSet) : MyViewPag
 
         binding.fragmentPlaceholder.text = context.getString(placeholderResId)
 
-        val placeholderActionResId = if (context.hasPermission(PERMISSION_READ_CONTACTS)) {
-            R.string.create_new_contact
-        } else {
-            R.string.request_access
-        }
-
         binding.fragmentPlaceholder2.apply {
-            text = context.getString(placeholderActionResId)
-            underlineText()
-            setOnClickListener {
-                if (context.hasPermission(PERMISSION_READ_CONTACTS)) {
-                    activity?.launchCreateNewContactIntent()
-                } else {
-                    requestReadContactsPermission()
-                }
+            if (!canRead) {
+                beVisible()
+                text = context.getString(R.string.request_access)
+                underlineText()
+                setOnClickListener { requestReadContactsPermission() }
+            } else if (canEditDeviceContacts()) {
+                beVisible()
+                text = context.getString(R.string.create_new_contact)
+                underlineText()
+                setOnClickListener { activity?.launchCreateNewContactIntent() }
+            } else {
+                beGone()
+                setOnClickListener(null)
             }
         }
     }
@@ -111,7 +111,9 @@ class ContactsFragment(context: Context, attributeSet: AttributeSet) : MyViewPag
         if (contacts.isEmpty()) {
             binding.apply {
                 fragmentPlaceholder.beVisible()
-                fragmentPlaceholder2.beVisible()
+                fragmentPlaceholder2.beVisibleIf(
+                    !context.hasPermission(PERMISSION_READ_CONTACTS) || canEditDeviceContacts()
+                )
                 fragmentList.beGone()
             }
         } else {
@@ -127,11 +129,12 @@ class ContactsFragment(context: Context, attributeSet: AttributeSet) : MyViewPag
                     contacts = contacts,
                     recyclerView = binding.fragmentList,
                     refreshItemsListener = this,
+                    showDeleteButton = canEditDeviceContacts(),
                     itemClick = {
                         activity?.handleGenericContactClick(it as Contact)
                     },
                     profileIconClick = {
-                        activity?.startContactDetailsIntent(it as Contact)
+                        activity?.handleGenericContactClick(it as Contact)
                     }
                 ).apply {
                     binding.fragmentList.adapter = this
@@ -186,7 +189,12 @@ class ContactsFragment(context: Context, attributeSet: AttributeSet) : MyViewPag
         activity?.handlePermission(PERMISSION_READ_CONTACTS) {
             if (it) {
                 binding.fragmentPlaceholder.text = context.getString(R.string.no_contacts_found)
-                binding.fragmentPlaceholder2.text = context.getString(R.string.create_new_contact)
+                if (canEditDeviceContacts()) {
+                    binding.fragmentPlaceholder2.beVisible()
+                    binding.fragmentPlaceholder2.text = context.getString(R.string.create_new_contact)
+                } else {
+                    binding.fragmentPlaceholder2.beGone()
+                }
                 ContactsHelper(context).getContacts(showOnlyContactsWithNumbers = true) { contacts ->
                     activity?.runOnUiThread {
                         gotContacts(contacts)

@@ -62,6 +62,7 @@ import org.fossify.phone.extensions.startAddContactIntent
 import org.fossify.phone.extensions.startCallWithConfirmationCheck
 import org.fossify.phone.extensions.startContactDetailsIntent
 import org.fossify.phone.helpers.RecentsHelper
+import org.fossify.phone.helpers.canEditDeviceContacts
 import org.fossify.phone.interfaces.RefreshItemsListener
 import org.fossify.phone.models.CallLogItem
 import org.fossify.phone.models.RecentCall
@@ -113,10 +114,11 @@ class RecentCallsAdapter(
 
             findItem(R.id.cab_block_number).title = activity.addLockedLabelIfNeeded(R.string.block_number)
             findItem(R.id.cab_block_number).isVisible = isNougatPlus()
-            findItem(R.id.cab_add_number).isVisible = isOneItemSelected
+            findItem(R.id.cab_add_number).isVisible = isOneItemSelected && canEditDeviceContacts()
             findItem(R.id.cab_copy_number).isVisible = isOneItemSelected
             findItem(R.id.cab_show_call_details).isVisible = isOneItemSelected
-            findItem(R.id.cab_view_details).isVisible = isOneItemSelected && findContactByCall(selectedItems.first()) != null
+            findItem(R.id.cab_view_details).isVisible =
+                isOneItemSelected && canEditDeviceContacts() && findContactByCall(selectedItems.first()) != null
         }
     }
 
@@ -374,8 +376,9 @@ class RecentCallsAdapter(
                 findItem(R.id.cab_call_sim_1).isVisible = areMultipleSIMsAvailable && !call.isUnknownNumber
                 findItem(R.id.cab_call_sim_2).isVisible = areMultipleSIMsAvailable && !call.isUnknownNumber
                 findItem(R.id.cab_send_sms).isVisible = !call.isUnknownNumber
-                findItem(R.id.cab_view_details).isVisible = contact != null && !call.isUnknownNumber
-                findItem(R.id.cab_add_number).isVisible = !call.isUnknownNumber
+                findItem(R.id.cab_view_details).isVisible =
+                    canEditDeviceContacts() && contact != null && !call.isUnknownNumber
+                findItem(R.id.cab_add_number).isVisible = canEditDeviceContacts() && !call.isUnknownNumber
                 findItem(R.id.cab_copy_number).isVisible = !call.isUnknownNumber
                 findItem(R.id.cab_show_call_details).isVisible = !call.isUnknownNumber
                 findItem(R.id.cab_block_number).title = activity.addLockedLabelIfNeeded(R.string.block_number)

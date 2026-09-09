@@ -56,10 +56,10 @@ import org.fossify.phone.extensions.getKeyEvent
 import org.fossify.phone.extensions.setupWithContacts
 import org.fossify.phone.extensions.startAddContactIntent
 import org.fossify.phone.extensions.startCallWithConfirmationCheck
-import org.fossify.phone.extensions.startContactDetailsIntent
 import org.fossify.phone.helpers.DIALPAD_TONE_LENGTH_MS
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.helpers.ToneGeneratorHelper
+import org.fossify.phone.helpers.canEditDeviceContacts
 import org.fossify.phone.models.SpeedDial
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -225,6 +225,8 @@ class DialpadActivity : SimpleActivity() {
         updateTextColors(binding.dialpadHolder)
         binding.dialpadClearChar.applyColorFilter(getProperTextColor())
         setupTopAppBar(binding.dialpadAppbar, NavigationIcon.Arrow)
+        binding.dialpadToolbar.menu.findItem(R.id.add_number_to_contact)?.isVisible =
+            canEditDeviceContacts()
     }
 
     private fun setupOptionsMenu() {
@@ -338,12 +340,14 @@ class DialpadActivity : SimpleActivity() {
             contacts = filtered,
             recyclerView = binding.dialpadList,
             highlightText = text,
+            showDeleteButton = canEditDeviceContacts(),
             itemClick = {
                 startCallWithConfirmationCheck(it as Contact)
                 clearInputWithDelay()
             },
             profileIconClick = {
-                startContactDetailsIntent(it as Contact)
+                startCallWithConfirmationCheck(it as Contact)
+                clearInputWithDelay()
             }).apply {
             binding.dialpadList.adapter = this
         }

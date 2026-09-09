@@ -15,6 +15,7 @@ import org.fossify.commons.extensions.telecomManager
 import org.fossify.commons.helpers.KEY_PHONE
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.phone.helpers.Config
+import org.fossify.phone.helpers.canEditDeviceContacts
 import org.fossify.phone.models.SIMAccount
 
 val Context.config: Config get() = Config.newInstance(applicationContext)
@@ -88,6 +89,9 @@ fun Context.launchAccountsConfiguration() {
 }
 
 fun Activity.startAddContactIntent(phoneNumber: String) {
+    if (!canEditDeviceContacts()) {
+        return
+    }
     Intent().apply {
         action = Intent.ACTION_INSERT_OR_EDIT
         type = "vnd.android.cursor.item/contact"

@@ -43,6 +43,7 @@ import org.fossify.phone.fragments.RecentsFragment
 import org.fossify.phone.helpers.DeviceNotificationCue
 import org.fossify.phone.helpers.OPEN_DIAL_PAD_AT_LAUNCH
 import org.fossify.phone.helpers.RecentsHelper
+import org.fossify.phone.helpers.canEditDeviceContacts
 import org.fossify.phone.helpers.tabsList
 import org.fossify.phone.models.Events
 import org.greenrobot.eventbus.EventBus
@@ -202,7 +203,8 @@ class MainActivity : SimpleActivity() {
             findItem(R.id.clear_call_history).isVisible = currentFragment == getRecentsFragment()
             findItem(R.id.sort).isVisible = currentFragment != getRecentsFragment()
             findItem(R.id.filter).isVisible = currentFragment != getRecentsFragment()
-            findItem(R.id.create_new_contact).isVisible = currentFragment == getContactsFragment()
+            findItem(R.id.create_new_contact).isVisible =
+                canEditDeviceContacts() && currentFragment == getContactsFragment()
             findItem(R.id.change_view_type).isVisible = currentFragment == getFavoritesFragment()
             findItem(R.id.column_count).isVisible = currentFragment == getFavoritesFragment() && config.viewType == VIEW_TYPE_GRID
             findItem(R.id.more_apps_from_us).isVisible = !resources.getBoolean(R.bool.hide_google_relations)

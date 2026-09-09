@@ -34,6 +34,7 @@ import org.fossify.phone.extensions.areMultipleSIMsAvailable
 import org.fossify.phone.extensions.callContactWithSim
 import org.fossify.phone.extensions.config
 import org.fossify.phone.extensions.startContactDetailsIntent
+import org.fossify.phone.helpers.canEditDeviceContacts
 import org.fossify.phone.interfaces.RefreshItemsListener
 import java.util.Collections
 
@@ -91,10 +92,10 @@ class ContactsAdapter(
             findItem(R.id.cab_call_sim_2).isVisible = hasMultipleSIMs && isOneItemSelected
             findItem(R.id.cab_remove_default_sim).isVisible = isOneItemSelected && (activity.config.getCustomSIM(selectedNumber) ?: "") != ""
 
-            findItem(R.id.cab_delete).isVisible = showDeleteButton
+            findItem(R.id.cab_delete).isVisible = showDeleteButton && canEditDeviceContacts()
             findItem(R.id.cab_create_shortcut).title = activity.addLockedLabelIfNeeded(R.string.create_shortcut)
             findItem(R.id.cab_create_shortcut).isVisible = isOneItemSelected && isOreoPlus()
-            findItem(R.id.cab_view_details).isVisible = isOneItemSelected
+            findItem(R.id.cab_view_details).isVisible = isOneItemSelected && canEditDeviceContacts()
             findItem(R.id.cab_block_unblock_contact).isVisible = isOneItemSelected && isNougatPlus()
             getCabBlockContactTitle { title ->
                 findItem(R.id.cab_block_unblock_contact).title = title
