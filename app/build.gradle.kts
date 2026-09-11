@@ -248,6 +248,8 @@ dependencies {
     implementation(libs.libphonenumber)
     implementation(libs.geocoder)
     detektPlugins(libs.compose.detekt)
+    testImplementation(libs.org.json)
+    testImplementation(libs.junit)
 }
 
 androidComponents {

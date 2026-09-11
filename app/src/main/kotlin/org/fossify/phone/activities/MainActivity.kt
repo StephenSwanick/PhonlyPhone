@@ -40,6 +40,7 @@ import org.fossify.phone.fragments.ContactsFragment
 import org.fossify.phone.fragments.FavoritesFragment
 import org.fossify.phone.fragments.MyViewPagerFragment
 import org.fossify.phone.fragments.RecentsFragment
+import org.fossify.phone.helpers.ContactsSyncScheduler
 import org.fossify.phone.helpers.DeviceNotificationCue
 import org.fossify.phone.helpers.OPEN_DIAL_PAD_AT_LAUNCH
 import org.fossify.phone.helpers.RecentsHelper
@@ -274,7 +275,12 @@ class MainActivity : SimpleActivity() {
 
     private fun checkContactPermissions() {
         handlePermission(PERMISSION_READ_CONTACTS) {
-            initFragments()
+            handlePermission(PERMISSION_WRITE_CONTACTS) { writeGranted ->
+                if (writeGranted) {
+                    ContactsSyncScheduler.request(this)
+                }
+                initFragments()
+            }
         }
     }
 
@@ -655,5 +661,12 @@ class MainActivity : SimpleActivity() {
     @Subscribe(threadMode = ThreadMode.MAIN)
     fun refreshCallLog(event: Events.RefreshCallLog) {
         getRecentsFragment()?.refreshItems()
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun refreshContacts(event: Events.RefreshContacts) {
+        getContactsFragment()?.refreshItems()
+        getFavoritesFragment()?.refreshItems()
+        cacheContacts()
     }
 }

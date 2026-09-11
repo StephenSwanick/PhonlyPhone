@@ -9,13 +9,25 @@ This app stays its own public repo. Not inside PhonlyV1 / Phonly Code.
 Kotlin namespace stays `org.fossify.phone`. Install id is `co.phonly.phone` (debug and release; no `.debug` suffix).  
 Messages / SMS is a later repo (PhonlyMessages, `co.phonly.messages`). Do not put SMS here.
 
+## Status (2026-09-11) — Phone 37 names proven on AAAAY; this cut closed
+
+**1.5.0 / 37** is the Contacts Provider **writer**. Esper `allowlist_json` this package already receives → upsert/delete Android Contacts. The Contacts tab still **reads the Provider** (not JSON labels). Kid cannot add/edit/delete (`canEditDeviceContacts()`).
+
+**`co.phonly.contacts` is retired.** Do not wait on that package. Do not send work back to the PhonlyContacts repo. PhonlyV1 will stop pushing AppConfig to it (that change is not this repo). **Send to phone** → Phone (+ Messages) is enough for names once 37 is on the device.
+
+**AAAAY (V2-DEV v51.0):** CONVERGE Command Success ~12:00Z. Default Phone + **Send to phone** + open Phone → **Android Contacts matched the parent dashboard.** A later parent add + Send appeared on the unit. Kid UI has no add/edit/delete. **37 is the APK.** Later note/comment edits do not need a new build.
+
+**Paused:** pin 37 over live **34** on Home/School/Troubleshooter; HIDE Samsung Contacts on live V2. Operator will try **Lila** this weekend. Live Home/School/TS still **34** (no name writer). Lila only gets names if she lands on a blueprint that already pins 37 (V2-DEV does). Do not pin 37 over live 34 unless asked. Do not fleet CONVERGE. Do not edit Messages or PhonlyV1 from here. Do not Save KSP.
+
+**1.4.0 / 36** remains in library history. 36 does not write Contacts Provider.
+
 ## Status (2026-09-09) — Phone 36 on AAAAY (V2-DEV)
 
 **1.4.0 / 36** is in the Esper library and pinned SHOW on **PhonlyV2 - DEV v44.0**. Operator CONVERGEd AAAAY: Phone, Messages, and `co.phonly.contacts` are all on that unit. Live Home/School/TS stay on **34**. Do not copy 36 onto those blueprints until asked (APK replace drops default Phone).
 
-This cut: Esper boolean **`allowlist_enabled`** next to **`allowlist_json`** (only explicit `false` allows all calls; missing or `true` = today’s empty-list = emergency only). Kid cannot create/edit/delete Android contacts (`canEditDeviceContacts()`). Names still come from Contacts Provider. This APK does **not** write that DB and does **not** read `label` from `allowlist_json`. Tap calls.
+This cut: Esper boolean **`allowlist_enabled`** next to **`allowlist_json`** (only explicit `false` allows all calls; missing or `true` = today’s empty-list = emergency only). Kid cannot create/edit/delete Android contacts (`canEditDeviceContacts()`). Names still come from Contacts Provider. 36 does **not** write that DB and does **not** read `label` from `allowlist_json`. Tap calls.
 
-**Lab leftover (not this APK):** **Send to phone** still pushes Phone + Messages only. 2026-09-09 ~11:43Z AAAAY AppConfig for those two packages matched Mongo (Stephen / Andrea / Erik / Christina / Catherine, `allowlist_enabled: true`). `co.phonly.contacts` got no AppConfig, so names in Phone did not change. Third Esper target is PhonlyV1. Testing continues elsewhere.
+**Lab leftover (36):** **Send to phone** still pushes Phone + Messages only. 2026-09-09 ~11:43Z AAAAY AppConfig for those two packages matched Mongo (Stephen / Andrea / Erik / Christina / Catherine, `allowlist_enabled: true`). `co.phonly.contacts` got no AppConfig, so names in Phone did not change. 37 writes names from Phone’s own AppConfig, so that third target is no longer required for names.
 
 **1.3.0 / 35** was the local `allowlist_enabled` cut; **36** superseded it before library upload. Do not pin 35.
 
@@ -104,8 +116,10 @@ Do **not** put kid numbers in KSP / Backbone.
 
 ## Kid view-only contacts
 
-- Names in Contacts / Recents / caller ID come from Android Contacts Provider. `co.phonly.contacts` writes that DB. This APK does **not** write Contacts Provider and does **not** read `label` from `allowlist_json`.
-- Kid UI: view names, tap to call or text. Create / add-to-contact / delete / system contact editor are hidden (`canEditDeviceContacts()`).
+- **This APK writes the book.** `allowlist_json` (already on `co.phonly.phone`) → upsert/delete Contacts Provider (`e164` + `label`; ignores `voice` / `sms` / `allowlist_enabled` for names).
+- The Contacts tab / Recents / caller ID **read the Provider**. Do **not** paint the tab from JSON labels.
+- Kid UI: view names, tap to call or text. Create / add-to-contact / delete / system contact editor stay hidden (`canEditDeviceContacts()` = false).
+- **`co.phonly.contacts` is retired.** Do not wait on it. Do not send work to the PhonlyContacts repo. Names do not need a third Esper AppConfig target.
 
 ## Default Phone app
 
@@ -130,11 +144,11 @@ No VVM inbox in this APK. Leave Samsung/T-Mobile Visual Voicemail SHOW if that i
 
 - `JAVA_HOME` = Android Studio `jbr`, `ANDROID_HOME` = `%LOCALAPPDATA%\Android\Sdk`.
 - Debug: `.\gradlew.bat assembleFossDebug` → `%USERPROFILE%\AppData\Local\phonly-phone-build\app\outputs\apk\foss\debug\`.
-- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-36-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). First Esper cut is **not** minified.
+- Release (Esper): `.\gradlew.bat assembleFossRelease` → `...\foss\release\phone-37-foss-release.apk`. Signing: `%LOCALAPPDATA%\phonly-phone-signing\` (not git, not Dropbox). First Esper cut is **not** minified.
 - Build output is **outside Dropbox**. Do not sync `app/build`, `build`, `.gradle` in Dropbox.
 
 ## Suggested next
 
-This Phone cut is closed. Testing is elsewhere. **Send to phone** must gain a third Esper target (`co.phonly.contacts`) in PhonlyV1 before names appear. Do not pin 36 over **34** on live Home/School/TS. Do not fleet CONVERGE. Do not Save KSP unless asked.
+This Phone cut is closed. Operator: Lila this weekend if she gets Phone 37. Do not pin 37 over live **34** unless asked. Do not fleet CONVERGE. Do not edit Messages or PhonlyV1. Do not Save KSP unless asked. Do not wait on `co.phonly.contacts`.
 
 Do not mix Esper V1=V2 cutover, PhonlyV1 codebase, or Knox Manage into this folder unless asked.
